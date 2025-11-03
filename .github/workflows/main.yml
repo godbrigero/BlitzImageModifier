@@ -27,8 +27,8 @@ jobs:
           bind_mount_repository: true
           base_image: ${{ matrix.base_image }}
           commands: |
-            chmod +x ${{matrix.script}}
-            ${{ matrix.script }}
+            chmod +x ./${{matrix.script}}
+            ./${{ matrix.script }}
             chmod +x ./installation_common.sh
             ./installation_common.sh
             chmod +x ./installation_blitz.sh
