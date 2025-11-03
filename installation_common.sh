@@ -32,6 +32,7 @@ sudo apt install -y \
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
+. $HOME/.cargo/env
 
 PYTHON3_PATH="$(command -v python3)"
 if [ -z "$PYTHON3_PATH" ]; then
