@@ -1,6 +1,8 @@
 #!/bin/bash
 
-cd ~/Documents
+INSTALLATION_DIR="/opt/blitz"
+
+cd $INSTALLATION_DIR
 
 git clone https://github.com/PinewoodRobotics/autobahn.git
 

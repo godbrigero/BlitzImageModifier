@@ -1,11 +1,14 @@
 #!/bin/bash
 
-if [ -z "~/Documents/B.L.I.T.Z/system_data/name.txt" ]; then
+INSTALLATION_DIR="/opt/blitz"
+NAME_PATH="$INSTALLATION_DIR/B.L.I.T.Z/system_data/name.txt"
+
+if [ -z $NAME_PATH ]; then
     echo "UNDEFINED BEHAVIOR: No name.txt file found in ~/Documents/B.L.I.T.Z/system_data/"
     exit 1
 fi
 
-NAME=$(cat ~/Documents/B.L.I.T.Z/system_data/name.txt)
+NAME=$(cat $NAME_PATH)
 
 if [ "$NAME" != "blitz-pi-random-name-1234" ]; then
     exit 0
@@ -21,5 +24,5 @@ function get_name() {
 }
 
 NAME=$(get_name)
-echo "$NAME" > ~/Documents/B.L.I.T.Z/system_data/name.txt
+echo "$NAME" > $NAME_PATH
 reboot

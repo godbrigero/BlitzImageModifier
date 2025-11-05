@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  pi5:
+    build:
+      context: .
+    privileged: true
+    stdin_open: true
+    tty: true
+    ports:
+      - "5555:5555"
