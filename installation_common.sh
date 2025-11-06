@@ -1,7 +1,7 @@
 #!/bin/bash
 
 sudo apt-get update
-sudo apt install -y \
+sudo apt-get install -y \
     curl \
     git \
     build-essential \
@@ -28,7 +28,7 @@ sudo apt install -y \
     libreadline-dev \
     libsqlite3-dev \
     libffi-dev \
-    liblzma-dev \ 
+    liblzma-dev \
     openssh-server
 
 sudo systemctl enable ssh
