@@ -1,5 +1,5 @@
 name: Build Blitz Image
-on: [push]
+on: [release]
 
 jobs:
   build:
@@ -27,18 +27,8 @@ jobs:
           bind_mount_repository: true
           base_image: ${{ matrix.base_image }}
           commands: |
-            chmod +x ./installation_common.sh
-            ./installation_common.sh
-            chmod +x ./installation_blitz.sh
-            ./installation_blitz.sh
-            chmod +x ./installation_autobahn.sh
-            ./installation_autobahn.sh
-            mkdir -p /opt/blitz/
-            echo "${{ github.ref_name }};${{ matrix.name }}" > /opt/blitz/image-version
-            chmod +x ./post_install.sh
-            ./post_install.sh
-            chmod +x ./${{matrix.script}}
-            ./${{ matrix.script }}
+            chmod +x ./main_startup.sh
+            ./main_startup.sh ${{ matrix.script }}
       - name: Compress built image
         run: |
           mv ${{ steps.install_deps.outputs.image }} blitz_${{ matrix.name }}.img
