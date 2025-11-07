@@ -41,3 +41,6 @@ echo "Output file: ${ARGS}.img.xz"
 
 ls -la "${ARGS}.img.xz"
 ls -la .
+
+mkdir -p /host/outputs/
+cp "${ARGS}.img.xz" /host/outputs/${ARGS}.img.xz

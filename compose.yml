@@ -2,10 +2,11 @@ version: "3.8"
 
 services:
   pi5:
-    build:
-      context: .
+    build: .
     privileged: true
     stdin_open: true
+    volumes:
+      - .:/host
     tty: true
     ports:
       - "5555:5555"
