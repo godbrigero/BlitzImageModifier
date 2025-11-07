@@ -16,8 +16,8 @@ WORKDIR /workspace
 RUN wget https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2024-07-04/2024-07-04-raspios-bookworm-arm64-lite.img.xz && \
     xz -d 2024-07-04-raspios-bookworm-arm64-lite.img.xz && \
     echo "Image downloaded and extracted" && \
-    truncate -s +4G 2024-07-04-raspios-bookworm-arm64-lite.img && \
-    echo "Image expanded by 4GB"
+    truncate -s +6G 2024-07-04-raspios-bookworm-arm64-lite.img && \
+    echo "Image expanded by 6GB"
 
 RUN mkdir -p /mnt/raspios
 
