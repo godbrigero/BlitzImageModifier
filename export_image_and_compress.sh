@@ -34,7 +34,7 @@ ls -lh "$IMAGE_FILE"
 
 echo "Done with image! Exporting and compressing..."
 mv "$IMAGE_FILE" "${ARGS}.img"
-xz -T0 -9 "${ARGS}.img"
+xz -z -T0 -6 --check=crc64 "${ARGS}.img"
 
 echo "✅ Done with export and compression!"
 echo "Output file: ${ARGS}.img.xz"
