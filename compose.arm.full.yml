@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  blitz-arm-full:
+    build:
+      context: .
+      dockerfile: Dockerfile.arm.full
+    privileged: true
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/host
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    tmpfs:
+      - /run
+      - /run/lock
+      - /tmp
+    ports:
+      - "5555:5555"
+      - "2222:22" # SSH access from host machine
+      - "8080:8080" # HTTP access from host machine
+      - "5005:5000" # HTTP access from host machine
+    cap_add:
+      - SYS_ADMIN
+      - SYS_BOOT
+      - NET_ADMIN
+    security_opt:
+      - seccomp:unconfined
+    cgroup: host

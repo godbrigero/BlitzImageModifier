@@ -1,0 +1,117 @@
+FROM --platform=linux/arm64 ubuntu:24.04
+
+# Install base system packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    wget \
+    git \
+    vim \
+    nano \
+    sudo \
+    systemd \
+    systemd-sysv \
+    cmake \
+    protobuf-compiler \
+    thrift-compiler \
+    make \
+    pkg-config \
+    python3 \
+    python3-venv \
+    python3-dev \
+    python3-pip \
+    python3-opencv \
+    libssl-dev \
+    libclang-dev \
+    sshpass \
+    rsync \
+    udev \
+    avahi-daemon \
+    avahi-utils \
+    libnss-mdns \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libffi-dev \
+    liblzma-dev \
+    openssh-server \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure ubuntu user (already exists in Ubuntu 24.04) with passwordless sudo
+RUN usermod -aG sudo ubuntu && \
+    echo "ubuntu:ubuntu" | chpasswd && \
+    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu && \
+    echo "root ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/root && \
+    chmod 0440 /etc/sudoers.d/ubuntu && \
+    chmod 0440 /etc/sudoers.d/root
+
+WORKDIR /workspace
+
+# Copy installation scripts
+COPY installation_common.sh installation_blitz.sh installation_autobahn.sh /workspace/
+
+# Enable services
+RUN systemctl enable ssh && \
+    systemctl enable avahi-daemon
+
+# Install Rust for root
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Rust for ubuntu user
+RUN su - ubuntu -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+
+# Setup environment for ubuntu user
+RUN echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /home/ubuntu/.bashrc && \
+    echo 'source $HOME/.cargo/env 2>/dev/null || true' >> /home/ubuntu/.bashrc && \
+    echo 'export PATH="/usr/local/bin:$PATH"' >> /home/ubuntu/.bashrc
+
+# Setup Python symlink
+RUN ln -sf "$(command -v python3)" /usr/local/bin/python
+
+# Add cargo to system path
+ENV PATH="/home/ubuntu/.cargo/bin:${PATH}"
+
+# Create installation directory
+RUN mkdir -p /opt/blitz && chown -R ubuntu:ubuntu /opt/blitz
+
+# Install Blitz as ubuntu user
+RUN su - ubuntu -c "cd /opt/blitz && \
+    git clone -b merge-backend https://github.com/PinewoodRobotics/B.L.I.T.Z.git && \
+    cd B.L.I.T.Z && \
+    git submodule update --init --recursive && \
+    bash scripts/install.sh --name blitz-pi-dev" || echo "Blitz install completed"
+
+# Install Autobahn as ubuntu user
+RUN su - ubuntu -c "cd /opt/blitz && \
+    git clone https://github.com/PinewoodRobotics/autobahn.git && \
+    cd autobahn && \
+    bash ./scripts/install.sh" || echo "Autobahn install completed"
+
+# Copy all workspace files
+COPY . /workspace
+
+WORKDIR /workspace
+
+# Configure systemd
+ENV container=docker
+RUN systemctl set-default multi-user.target
+
+# Create systemd environment file for services
+RUN mkdir -p /etc/systemd/system.conf.d && \
+    echo '[Manager]' > /etc/systemd/system.conf.d/environment.conf && \
+    echo 'DefaultEnvironment="PATH=/home/ubuntu/.cargo/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /etc/systemd/system.conf.d/environment.conf && \
+    echo 'DefaultEnvironment="CARGO_HOME=/home/ubuntu/.cargo"' >> /etc/systemd/system.conf.d/environment.conf
+
+# Stop systemd from trying to start unnecessary services
+RUN systemctl mask systemd-resolved.service \
+    systemd-networkd.service \
+    systemd-timesyncd.service
+
+VOLUME ["/sys/fs/cgroup"]
+
+STOPSIGNAL SIGRTMIN+3
+
+CMD ["/lib/systemd/systemd"]

@@ -6,8 +6,8 @@ NAME_PATH="$INSTALLATION_DIR/B.L.I.T.Z/system_data/name.txt"
 
 if [ ! -f "$NAME_PATH" ]; then
     echo "name.txt not found at $NAME_PATH; creating it."
-    sudo mkdir -p "$(dirname "$NAME_PATH")"
-    echo "blitz-pi-random-name-1234" | sudo tee "$NAME_PATH" >/dev/null
+    mkdir -p "$(dirname "$NAME_PATH")"
+    echo "blitz-pi-random-name-1234" | tee "$NAME_PATH" >/dev/null
 fi
 
 NAME=$(cat "$NAME_PATH")
@@ -33,12 +33,13 @@ function get_name() {
     echo "$NEW_NAME"
 }
 
-NAME=$(get_name)
-echo "$NAME" | sudo tee "$NAME_PATH" >/dev/null
+NEW_NAME=$(get_name)
 
-sudo hostnamectl set-hostname "$NAME"
-grep -q "^127.0.1.1[[:space:]]\+$NAME$" /etc/hosts || echo "127.0.1.1 $NAME" | sudo tee -a /etc/hosts >/dev/null
-sudo systemctl restart avahi-daemon
-sudo systemctl restart ssh
+echo "$NEW_NAME" | tee "$NAME_PATH" >/dev/null
+
+hostnamectl set-hostname "$NEW_NAME"
+grep -q "^127.0.1.1[[:space:]]\+$NEW_NAME$" /etc/hosts || echo "127.0.1.1 $NEW_NAME" | tee -a /etc/hosts >/dev/null
+systemctl restart avahi-daemon
+systemctl restart ssh
 
 reboot

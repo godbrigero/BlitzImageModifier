@@ -34,13 +34,6 @@ ls -lh "$IMAGE_FILE"
 
 echo "Done with image! Exporting and compressing..."
 mv "$IMAGE_FILE" "${ARGS}.img"
-xz -z -T0 -6 --check=crc64 "${ARGS}.img"
-
-echo "✅ Done with export and compression!"
-echo "Output file: ${ARGS}.img.xz"
-
-ls -la "${ARGS}.img.xz"
-ls -la .
 
 mkdir -p /host/outputs/
-cp "${ARGS}.img.xz" /host/outputs/${ARGS}.img.xz
+cp "${ARGS}.img" /host/outputs/${ARGS}.img

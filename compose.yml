@@ -9,4 +9,4 @@ services:
       - .:/host
     tty: true
     ports:
-      - "5555:5555"
+      - "6756:6756"
