@@ -7,7 +7,9 @@ DEFAULT_PI_NAME="blitz-pi-random-name-1234"
 
 cd "$INSTALLATION_DIR"
 
-git clone -b "$BRANCH_NAME" https://github.com/PinewoodRobotics/B.L.I.T.Z.git
+if [ ! -d "B.L.I.T.Z" ]; then
+    git clone -b "$BRANCH_NAME" https://github.com/PinewoodRobotics/B.L.I.T.Z.git
+fi
 cd B.L.I.T.Z
 git submodule update --init --recursive
 
