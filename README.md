@@ -53,30 +53,30 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 
   - Based on `ubuntu:24.04`, installs tooling (qemu-user-static, kpartx, parted, e2fsprogs, etc.)
   - Downloads `raspios-bookworm-arm64-lite` and expands the image by 4 GB
-  - Entrypoint runs `setup_image.sh` then `export_image_and_compress.sh`
+  - Entrypoint runs `setup_image.bash` then `export_image_and_compress.bash`
 
-- `setup_image.sh`
+- `setup_image.bash`
 
   - Attaches loop devices, fixes/extends partitions, runs `resize2fs`
   - Mounts the image (root and boot), binds `/dev`, `/proc`, `/sys`, `/workspace`
   - Copies `qemu-aarch64-static` into the chroot for ARM emulation
-  - Chroots into the image and runs `main_startup.sh pi5.sh`
+  - Chroots into the image and runs `main_startup.bash pi5.bash`
 
-- Inside the chroot (`main_startup.sh`)
+- Inside the chroot (`main_startup.bash`)
 
-  - Runs hardware script `pi5.sh` (installs udev rule)
-  - Runs `installation_common.sh` (packages, Rust, SSH/mDNS enable)
-  - Runs `installation_blitz.sh` (clones B.L.I.T.Z, `scripts/install.sh` with default name)
-  - Runs `installation_autobahn.sh` (clones Autobahn, installs)
-  - Runs `post_install.sh` (installs and enables first-boot service)
+  - Runs hardware script `pi5.bash` (installs udev rule)
+  - Runs `installation_common.bash` (packages, Rust, SSH/mDNS enable)
+  - Runs `installation_blitz.bash` (clones B.L.I.T.Z, `scripts/install.bash` with default name)
+  - Runs `installation_autobahn.bash` (clones Autobahn, installs)
+  - Runs `post_install.bash` (installs and enables first-boot service)
 
-- `export_image_and_compress.sh`
+- `export_image_and_compress.bash`
   - Cleanly unmounts/breaks down loop/mapper devices
   - Renames the image, compresses to `.img.xz`, and copies into `./outputs/`
 
 ## First boot behavior
 
-- A systemd service (`blitz_project.service`) runs `/usr/local/bin/blitzprojstartup.sh`.
+- A systemd service (`blitz_project.service`) runs `/usr/local/bin/blitzprojstartup.bash`.
 - On first boot, if the default name is still set, it will prompt on the console for a new device name and apply it (`hostnamectl`, `/etc/hosts`, restart Avahi/SSH), then reboot.
   - If you need a non-interactive first boot, pre-create `name.txt` inside the image at:
     - `/opt/blitz/B.L.I.T.Z/system_data/name.txt`
@@ -85,26 +85,26 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 
 - **Base image version**: in `Dockerfile` (`wget` URL). Update to a newer Raspberry Pi OS image if desired.
 - **Extra space**: in `Dockerfile` (`truncate -s +4G ...`). Increase if you need more room preinstalled.
-- **Hardware script**: currently `main_startup.sh` runs `pi5.sh`. Add your own script and change the argument in `setup_image.sh` (`main_startup.sh <your-script>.sh`).
-- **B.L.I.T.Z branch**: in `installation_blitz.sh` (`BRANCH_NAME="merge-backend"`). Change as needed.
-- **Default device name**: `installation_blitz.sh` (`DEFAULT_PI_NAME`). This is used on first boot before prompting.
-- **udev rules**: edit `installation/system-patch/90-usb-port-names.rules` or adapt `pi5.sh` to your hardware.
-- **Output filename**: `export_image_and_compress.sh` is invoked with `pi5_flash_image` by default (from `Dockerfile CMD`). Change it if you want a different name.
+- **Hardware script**: currently `main_startup.bash` runs `pi5.bash`. Add your own script and change the argument in `setup_image.bash` (`main_startup.bash <your-script>.bash`).
+- **B.L.I.T.Z branch**: in `installation_blitz.bash` (`BRANCH_NAME="merge-backend"`). Change as needed.
+- **Default device name**: `installation_blitz.bash` (`DEFAULT_PI_NAME`). This is used on first boot before prompting.
+- **udev rules**: edit `installation/system-patch/90-usb-port-names.rules` or adapt `pi5.bash` to your hardware.
+- **Output filename**: `export_image_and_compress.bash` is invoked with `pi5_flash_image` by default (from `Dockerfile CMD`). Change it if you want a different name.
 
 ## Directory overview
 
 - `Dockerfile`: Builder and orchestrator for the image creation
 - `compose.yml`: Docker Compose service (privileged) that runs the pipeline
-- `setup_image.sh`: Mounts/extends the downloaded image and enters chroot
-- `main_startup.sh`: Orchestrates installs and setup inside the chroot
-- `pi5.sh`: Installs udev rule for USB port naming
-- `installation_common.sh`: Common packages, Rust toolchain, SSH/mDNS enable
-- `installation_blitz.sh`: Clones/installs B.L.I.T.Z
-- `installation_autobahn.sh`: Clones/installs Autobahn
-- `post_install.sh`: Installs and enables first-boot naming service
+- `setup_image.bash`: Mounts/extends the downloaded image and enters chroot
+- `main_startup.bash`: Orchestrates installs and setup inside the chroot
+- `pi5.bash`: Installs udev rule for USB port naming
+- `installation_common.bash`: Common packages, Rust toolchain, SSH/mDNS enable
+- `installation_blitz.bash`: Clones/installs B.L.I.T.Z
+- `installation_autobahn.bash`: Clones/installs Autobahn
+- `post_install.bash`: Installs and enables first-boot naming service
 - `blitz_project.service`: systemd unit for first-boot naming
-- `blitzprojstartup.sh`: prompts for device name on first boot
-- `export_image_and_compress.sh`: unmounts, compresses, and copies output
+- `blitzprojstartup.bash`: prompts for device name on first boot
+- `export_image_and_compress.bash`: unmounts, compresses, and copies output
 - `outputs/`: final `.img.xz` artifacts
 
 ## Troubleshooting

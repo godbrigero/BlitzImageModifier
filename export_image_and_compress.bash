@@ -7,7 +7,7 @@ DO_COMPRESSION=${3:-true}
 
 MOUNT_POINT="/mnt/raspios"
 
-echo "Unmounting everything that setup_image.sh mounted..."
+echo "Unmounting everything that setup_image.bash mounted..."
 
 LOOP_DEV=$(losetup -j "$INPUT_IMAGE" | cut -d: -f1)
 if [ -z "$LOOP_DEV" ]; then

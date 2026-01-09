@@ -39,9 +39,9 @@ function build() {
     
     # Run the per-device script inside the chroot. Path must be valid inside the container/chroot.
     local SCRIPT_IN_CHROOT="./installation/devices_and_distros/$SCRIPT_NAME"
-    bash ./setup_image.sh "$UNZIPPED_IMAGE_PATH" "$SCRIPT_IN_CHROOT"
+    bash ./setup_image.bash "$UNZIPPED_IMAGE_PATH" "$SCRIPT_IN_CHROOT"
 
-    bash ./export_image_and_compress.sh "$UNZIPPED_IMAGE_PATH" "${SCRIPT_NAME%.*}_flash_image" "$COMPRESS_OUTPUT"
+    bash ./export_image_and_compress.bash "$UNZIPPED_IMAGE_PATH" "${SCRIPT_NAME%.*}_flash_image" "$COMPRESS_OUTPUT"
 }
 
 if [ "$BUILD_ALL" = true ]; then

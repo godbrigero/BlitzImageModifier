@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+# install common packages for ALL devices
+
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
     curl \

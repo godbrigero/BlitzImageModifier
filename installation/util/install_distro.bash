@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# installs distro to host machine in particular folder and returns the path to the image
+# installs distro to host machine in particular folder and returns the path to the image for caching purposes
 
 set -euo pipefail
 
