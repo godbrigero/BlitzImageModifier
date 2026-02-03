@@ -7,12 +7,24 @@ sudo apt-get install -y --no-install-recommends \
     curl \
     git \
     build-essential \
+    make \
     cmake \
     protobuf-compiler \
     thrift-compiler \
-    make \
     pkg-config \
     libssl-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libffi-dev \
+    liblzma-dev \
+    xz-utils \
+    libncursesw5-dev \
+    tk-dev \
+    uuid-dev \
+    libgdbm-dev \
+    libnss3-dev \
     libclang-dev \
     sshpass \
     rsync \
@@ -20,12 +32,6 @@ sudo apt-get install -y --no-install-recommends \
     avahi-daemon \
     avahi-utils \
     libnss-mdns \
-    zlib1g-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libffi-dev \
-    liblzma-dev \
     openssh-server \
     python3-dev \
     nano
