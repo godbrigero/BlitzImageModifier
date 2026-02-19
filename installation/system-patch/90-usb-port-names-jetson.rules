@@ -1,0 +1,25 @@
+# ===== USB PORT NAMING BY PHYSICAL PORT (Jetson / Tegra) =====
+# Observed topology:
+#   Host controller: usb1
+#   External hub:    1-2  (4-Port USB 2.0 Hub)
+#   Hub ports:       1-2.1, 1-2.2, 1-2.3, 1-2.4
+#
+# Cameras: lock to interface :1.0 and the capture node (index 0).
+# Add capture-capability guard to avoid metadata nodes.
+# Serial: match the same port on the hub (no :1.0).
+
+# ---------- CAMERA 1 (hub port 1-2.1) ----------
+SUBSYSTEM=="video4linux", KERNELS=="1-2.1:1.0", ATTR{index}=="0", ENV{ID_V4L_CAPABILITIES}=="*:capture:*", SYMLINK+="usb_cam1", TAG+="uaccess"
+SUBSYSTEM=="tty",         KERNELS=="1-2.1",                                             SYMLINK+="usb_cam1_tty", TAG+="uaccess"
+
+# ---------- CAMERA 2 (hub port 1-2.2) ----------
+SUBSYSTEM=="video4linux", KERNELS=="1-2.2:1.0", ATTR{index}=="0", ENV{ID_V4L_CAPABILITIES}=="*:capture:*", SYMLINK+="usb_cam2", TAG+="uaccess"
+SUBSYSTEM=="tty",         KERNELS=="1-2.2",                                             SYMLINK+="usb_cam2_tty", TAG+="uaccess"
+
+# ---------- CAMERA 3 (hub port 1-2.3) ----------
+SUBSYSTEM=="video4linux", KERNELS=="1-2.3:1.0", ATTR{index}=="0", ENV{ID_V4L_CAPABILITIES}=="*:capture:*", SYMLINK+="usb_cam3", TAG+="uaccess"
+SUBSYSTEM=="tty",         KERNELS=="1-2.3",                                             SYMLINK+="usb_cam3_tty", TAG+="uaccess"
+
+# ---------- CAMERA 4 (hub port 1-2.4) ----------
+SUBSYSTEM=="video4linux", KERNELS=="1-2.4:1.0", ATTR{index}=="0", ENV{ID_V4L_CAPABILITIES}=="*:capture:*", SYMLINK+="usb_cam4", TAG+="uaccess"
+SUBSYSTEM=="tty",         KERNELS=="1-2.4",                                             SYMLINK+="usb_cam4_tty", TAG+="uaccess"
