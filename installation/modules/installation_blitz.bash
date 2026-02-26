@@ -5,6 +5,7 @@ INSTALLATION_DIR="/opt/blitz"
 BRANCH_NAME="merge-backend"
 DEFAULT_PI_NAME="blitz-pi-random-name-1234"
 
+mkdir -p "$INSTALLATION_DIR"
 cd "$INSTALLATION_DIR"
 
 if [ ! -d "B.L.I.T.Z" ]; then
