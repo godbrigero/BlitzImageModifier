@@ -2,7 +2,7 @@
 set -euo pipefail
 
 INSTALLATION_DIR="/opt/blitz"
-BRANCH_NAME="merge-backend"
+BRANCH_NAME="main"
 DEFAULT_PI_NAME="blitz-pi-random-name-1234"
 
 cd "$INSTALLATION_DIR"
