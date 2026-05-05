@@ -2,15 +2,10 @@
 set -euo pipefail
 
 INSTALLATION_DIR="/opt/blitz"
-BRANCH_NAME="main"
 DEFAULT_PI_NAME="blitz-pi-random-name-1234"
 
-cd "$INSTALLATION_DIR"
-
-if [ ! -d "B.L.I.T.Z" ]; then
-    git clone -b "$BRANCH_NAME" https://github.com/PinewoodRobotics/B.L.I.T.Z.git
-fi
-cd B.L.I.T.Z
-git submodule update --init --recursive
-
-bash scripts/install.sh --name "$DEFAULT_PI_NAME"
+TARGET_NAME="$DEFAULT_PI_NAME" \
+TARGET_FOLDER="$INSTALLATION_DIR" \
+SERVICE_NAME="blitz-startup" \
+BLITZ_ASSUME_YES=true \
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/PinewoodRobotics/B.L.I.T.Z/HEAD/scripts/ui/install_on_system.sh)"

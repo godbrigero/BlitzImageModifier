@@ -46,11 +46,11 @@ pyenv global 3.12.6
 pip install opencv-python
 
 sudo systemctl enable ssh
-# sudo systemctl start ssh
-# sudo systemctl status ssh
+sudo systemctl start ssh
+sudo systemctl status ssh
 
 sudo systemctl enable avahi-daemon
-# sudo systemctl start avahi-daemon
+sudo systemctl start avahi-daemon
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
