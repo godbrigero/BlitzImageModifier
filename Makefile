@@ -6,6 +6,15 @@ else
   ARGS ?= pi5
 endif
 
+BLITZ_USER ?= ubuntu
+BLITZ_PASSWORD ?= ubuntu
+BLITZ_UID ?= 1000
+BLITZ_GID ?= 1000
+export BLITZ_USER
+export BLITZ_PASSWORD
+export BLITZ_UID
+export BLITZ_GID
+
 build-all:
 	COMPILE_ALL=true docker-compose up --build
 

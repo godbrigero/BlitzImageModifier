@@ -59,4 +59,14 @@ echo "$WORKSPACE is available inside the environment"
 echo "Running interactive shell..."
 echo ""
 
-chroot "$MOUNT_POINT" /bin/bash -lc "set -euo pipefail; cd /workspace && bash \"$RUN_INSIDE_CHROOT_SCRIPT\""
+BLITZ_USER="${BLITZ_USER:-ubuntu}"
+BLITZ_PASSWORD="${BLITZ_PASSWORD:-ubuntu}"
+BLITZ_UID="${BLITZ_UID:-1000}"
+BLITZ_GID="${BLITZ_GID:-1000}"
+
+chroot "$MOUNT_POINT" /usr/bin/env \
+    BLITZ_USER="$BLITZ_USER" \
+    BLITZ_PASSWORD="$BLITZ_PASSWORD" \
+    BLITZ_UID="$BLITZ_UID" \
+    BLITZ_GID="$BLITZ_GID" \
+    /bin/bash -lc "set -euo pipefail; cd /workspace && bash \"$RUN_INSIDE_CHROOT_SCRIPT\""

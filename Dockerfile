@@ -25,5 +25,9 @@ COPY . /workspace
 
 ENV COMPILE_ALL=${COMPILE_ALL}
 ENV FOR_X=${FOR_X}
+ENV BLITZ_USER=ubuntu
+ENV BLITZ_PASSWORD=ubuntu
+ENV BLITZ_UID=1000
+ENV BLITZ_GID=1000
 
 CMD bash -lc 'mkdir -p /mnt/raspios && bash installation/devices_and_distros/build.bash "$COMPILE_ALL" "$FOR_X"'

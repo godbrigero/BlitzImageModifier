@@ -1,9 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
+SUDO=()
+if [ "${EUID:-$(id -u)}" -ne 0 ]; then
+    SUDO=(sudo)
+fi
+
 # install common packages for ALL devices
-sudo apt-get update
-sudo apt-get install -y --no-install-recommends \
+"${SUDO[@]}" apt-get update
+"${SUDO[@]}" apt-get install -y --no-install-recommends \
+    sudo \
     curl \
     git \
     build-essential \
@@ -45,12 +51,12 @@ pyenv global 3.12.6
 
 pip install opencv-python
 
-sudo systemctl enable ssh
-sudo systemctl start ssh
-sudo systemctl status ssh
+"${SUDO[@]}" systemctl enable ssh
+"${SUDO[@]}" systemctl start ssh
+"${SUDO[@]}" systemctl status ssh
 
-sudo systemctl enable avahi-daemon
-sudo systemctl start avahi-daemon
+"${SUDO[@]}" systemctl enable avahi-daemon
+"${SUDO[@]}" systemctl start avahi-daemon
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
@@ -62,7 +68,7 @@ if [ -z "$PYTHON3_PATH" ]; then
   exit 1
 fi
 
-sudo ln -sf "$PYTHON3_PATH" /usr/local/bin/python
+"${SUDO[@]}" ln -sf "$PYTHON3_PATH" /usr/local/bin/python
 
 python3 --version
 python --version

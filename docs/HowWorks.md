@@ -114,6 +114,11 @@ This is separated so cleanup and export logic is consistent and easy to debug.
 
 The system is intended to ship with a placeholder name first, then ask for a real name on first boot.
 
+- The login account is created during image compilation, before the image is exported.
+- By default, the generated account is `ubuntu` with password `ubuntu`.
+- The account values can be overridden with Make variables such as `BLITZ_USER`, `BLITZ_PASSWORD`, `BLITZ_UID`, and `BLITZ_GID`.
+- `/opt/blitz` is owned by the generated account so normal user deploys can update file and directory timestamps there.
+
 - `installation/system-patch/blitzprojstartup.bash` checks this file:
   - `/opt/blitz/B.L.I.T.Z/system_data/name.txt`
 - If it is missing, it creates it with the default placeholder name.

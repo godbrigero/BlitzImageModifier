@@ -11,6 +11,7 @@ Create a preconfigured Raspberry Pi OS image (Pi 5, Bookworm arm64) with the Pin
 - **Chroots** into the image using QEMU to install software
 - **Installs** common system deps, Rust toolchain, SSH, mDNS
 - **Installs** B.L.I.T.Z (branch `merge-backend`) and Autobahn
+- **Creates** the target login user inside the image before export (`ubuntu` / `ubuntu` by default)
 - **Applies** USB udev naming rules and enables required services
 - **Configures** a first-boot service that asks for a device name
 - **Exports** and **compresses** the final image to `outputs/`
@@ -36,6 +37,19 @@ When the pipeline finishes, your output will be in:
 
 ```bash
 outputs/pi5_flash_image.img.xz
+```
+
+The generated image includes a pre-created user account:
+
+```text
+username: ubuntu
+password: ubuntu
+```
+
+To override it during image compilation:
+
+```bash
+make build-for pi5 BLITZ_USER=myuser BLITZ_PASSWORD=mypass
 ```
 
 You can then flash it to a microSD card (Linux example):
@@ -64,11 +78,13 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 
 - Inside the chroot (`main_startup.bash`)
 
+  - Runs `provision_user.bash` to create the target image user during compilation
   - Runs hardware script `pi5.bash` (installs udev rule)
   - Runs `installation_common.bash` (packages, Rust, SSH/mDNS enable)
   - Runs `installation_blitz.bash` (clones B.L.I.T.Z, `scripts/install.bash` with default name)
   - Runs `installation_autobahn.bash` (clones Autobahn, installs)
   - Runs `post_install.bash` (installs and enables first-boot service)
+  - Runs `finalize_permissions.bash` so `/opt/blitz` is owned by the target user
 
 - `export_image_and_compress.bash`
   - Cleanly unmounts/breaks down loop/mapper devices
@@ -76,6 +92,7 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 
 ## First boot behavior
 
+- The login account is already created during image compilation, before flashing.
 - A systemd service (`blitz_project.service`) runs `/usr/local/bin/blitzprojstartup.bash`.
 - On first boot, if the default name is still set, it will prompt on the console for a new device name and apply it (`hostnamectl`, `/etc/hosts`, restart Avahi/SSH), then reboot.
   - If you need a non-interactive first boot, pre-create `name.txt` inside the image at:
@@ -86,6 +103,7 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 - **Base image version**: in `Dockerfile` (`wget` URL). Update to a newer Raspberry Pi OS image if desired.
 - **Extra space**: in `Dockerfile` (`truncate -s +4G ...`). Increase if you need more room preinstalled.
 - **Hardware script**: currently `main_startup.bash` runs `pi5.bash`. Add your own script and change the argument in `setup_image.bash` (`main_startup.bash <your-script>.bash`).
+- **Target image user**: pass `BLITZ_USER`, `BLITZ_PASSWORD`, `BLITZ_UID`, or `BLITZ_GID` to `make`. Defaults are `ubuntu`, `ubuntu`, `1000`, and `1000`.
 - **B.L.I.T.Z branch**: in `installation_blitz.bash` (`BRANCH_NAME="merge-backend"`). Change as needed.
 - **Default device name**: `installation_blitz.bash` (`DEFAULT_PI_NAME`). This is used on first boot before prompting.
 - **udev rules**: edit `installation/system-patch/90-usb-port-names.rules` or adapt `pi5.bash` to your hardware.
@@ -97,6 +115,8 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 - `compose.yml`: Docker Compose service (privileged) that runs the pipeline
 - `setup_image.bash`: Mounts/extends the downloaded image and enters chroot
 - `main_startup.bash`: Orchestrates installs and setup inside the chroot
+- `provision_user.bash`: Creates the target login account inside the image
+- `finalize_permissions.bash`: Makes `/opt/blitz` owned by the target login account
 - `pi5.bash`: Installs udev rule for USB port naming
 - `installation_common.bash`: Common packages, Rust toolchain, SSH/mDNS enable
 - `installation_blitz.bash`: Clones/installs B.L.I.T.Z
