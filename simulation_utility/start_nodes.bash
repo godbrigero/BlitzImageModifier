@@ -9,8 +9,13 @@ SIM_CONTAINER_PREFIX="${SIM_CONTAINER_PREFIX:-blitz-sim}"
 SIM_AUTOBAHN_HOST_PORT_BASE="${SIM_AUTOBAHN_HOST_PORT_BASE:-${SIM_AUTOBANH_HOST_PORT_BASE:-18080}}"
 SIM_WATCHDOG_HOST_PORT_BASE="${SIM_WATCHDOG_HOST_PORT_BASE:-15000}"
 SIM_SSH_HOST_PORT_BASE="${SIM_SSH_HOST_PORT_BASE:-2220}"
+SIM_HOST_IP_PREFIX="${SIM_HOST_IP_PREFIX:-127.42.0}"
 SIM_NAMES="${SIM_NAMES:-}"
+PYTHON="${PYTHON:-python3}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SIM_MDNS_BRIDGE="${SIM_MDNS_BRIDGE:-$SCRIPT_DIR/mdns_bridge.py}"
 N="${N:-1}"
+SIM_STATUS_INTERVAL_SECONDS="${SIM_STATUS_INTERVAL_SECONDS:-3}"
 
 HOSTS_BEGIN="# BEGIN BlitzImageModifier simulation"
 HOSTS_END="# END BlitzImageModifier simulation"
@@ -70,16 +75,83 @@ function remove_container_if_present() {
 }
 
 function remove_all_sim_containers() {
-    local containers=()
-    local container
+    local containers
 
-    while IFS= read -r container; do
-        [ -n "$container" ] && containers+=("$container")
-    done < <(docker ps -aq --filter label=blitz.simulation=true)
+    containers="$(docker ps -aq --filter label=blitz.simulation=true)"
 
-    if [ "${#containers[@]}" -gt 0 ]; then
-        docker rm -f "${containers[@]}" >/dev/null
+    if [ -n "$containers" ]; then
+        printf '%s\n' "$containers" | xargs docker rm -f >/dev/null
     fi
+}
+
+function host_ip_for_index() {
+    local index="$1"
+
+    printf '%s.%s\n' "$SIM_HOST_IP_PREFIX" "$index"
+}
+
+function is_darwin() {
+    [ "$(uname -s)" = "Darwin" ]
+}
+
+function ensure_loopback_alias() {
+    local host_ip="$1"
+
+    if ! is_darwin; then
+        return
+    fi
+
+    if ifconfig lo0 | grep -q "inet $host_ip "; then
+        return
+    fi
+
+    sudo ifconfig lo0 alias "$host_ip" up
+}
+
+function remove_loopback_alias() {
+    local host_ip="$1"
+
+    if ! is_darwin; then
+        return
+    fi
+
+    case "$host_ip" in
+        "$SIM_HOST_IP_PREFIX".*) ;;
+        *) return ;;
+    esac
+
+    if ifconfig lo0 | grep -q "inet $host_ip "; then
+        sudo ifconfig lo0 -alias "$host_ip" >/dev/null 2>&1 || true
+    fi
+}
+
+function container_host_ip() {
+    local name="$1"
+
+    docker inspect \
+        --format '{{ index .Config.Labels "blitz.simulation.host-ip" }}' \
+        "$name" 2>/dev/null
+}
+
+function current_sim_host_ips() {
+    local container
+    local host_ip
+
+    docker ps -aq --filter label=blitz.simulation=true | while IFS= read -r container; do
+        [ -z "$container" ] && continue
+        host_ip="$(container_host_ip "$container")"
+        [ -n "$host_ip" ] && printf '%s\n' "$host_ip"
+    done
+}
+
+function host_ips_from_hosts_block() {
+    awk \
+        -v begin="$HOSTS_BEGIN" \
+        -v end="$HOSTS_END" \
+        -v prefix="$SIM_HOST_IP_PREFIX." \
+        '$0 == begin { in_block = 1; next } $0 == end { in_block = 0; next } in_block && index($1, prefix) == 1 { print $1 }' \
+        /etc/hosts \
+        | sort -u
 }
 
 function container_ip() {
@@ -130,10 +202,9 @@ function sync_container_hosts() {
     done
 }
 
-function up() {
+function resolved_sim_names() {
     local names=()
     local name
-    local index=1
 
     while IFS= read -r name; do
         [ -n "$name" ] && names+=("$name")
@@ -144,6 +215,18 @@ function up() {
         exit 1
     fi
 
+    printf '%s\n' "${names[@]}"
+}
+
+function start_containers() {
+    local names=()
+    local name
+    local index=1
+
+    while IFS= read -r name; do
+        [ -n "$name" ] && names+=("$name")
+    done < <(resolved_sim_names)
+
     require_positive_integer SIM_AUTOBAHN_HOST_PORT_BASE "$SIM_AUTOBAHN_HOST_PORT_BASE"
     require_positive_integer SIM_WATCHDOG_HOST_PORT_BASE "$SIM_WATCHDOG_HOST_PORT_BASE"
     require_positive_integer SIM_SSH_HOST_PORT_BASE "$SIM_SSH_HOST_PORT_BASE"
@@ -151,11 +234,11 @@ function up() {
     remove_all_sim_containers
 
     for name in "${names[@]}"; do
-        local autobahn_port=$((SIM_AUTOBAHN_HOST_PORT_BASE + index - 1))
-        local watchdog_port=$((SIM_WATCHDOG_HOST_PORT_BASE + index - 1))
-        local ssh_port=$((SIM_SSH_HOST_PORT_BASE + index - 1))
+        local host_ip
+        host_ip="$(host_ip_for_index "$index")"
 
         remove_container_if_present "$name"
+        ensure_loopback_alias "$host_ip"
 
         docker run -d \
             --name "$name" \
@@ -164,28 +247,34 @@ function up() {
             --network-alias "$name" \
             --network-alias "$name.local" \
             --label blitz.simulation=true \
+            --label "blitz.simulation.host-ip=$host_ip" \
             --privileged \
             --tmpfs /run \
             --tmpfs /run/lock \
             --volume /sys/fs/cgroup:/sys/fs/cgroup:rw \
-            -p "127.0.0.1:${autobahn_port}:8080" \
-            -p "127.0.0.1:${watchdog_port}:5000" \
-            -p "127.0.0.1:${ssh_port}:22" \
+            -p "${host_ip}:8080:8080" \
+            -p "${host_ip}:5000:5000" \
+            -p "${host_ip}:22:22" \
             -e "BLITZ_SIM_NAME=$name" \
             "$SIM_IMAGE" >/dev/null
 
-        printf 'started %s: autobahn=127.0.0.1:%s watchdog=127.0.0.1:%s ssh=127.0.0.1:%s\n' \
-            "$name" "$autobahn_port" "$watchdog_port" "$ssh_port"
+        printf 'started %s: host_ip=%s autobahn=%s:8080 watchdog=%s:5000 ssh=%s:22\n' \
+            "$name" "$host_ip" "$host_ip" "$host_ip" "$host_ip" >&2
 
         index=$((index + 1))
     done
 
     sync_container_hosts "${names[@]}"
 
-    printf 'optional: run `make sim-hosts` to map simulator .local names to 127.0.0.1 on this host.\n'
+    printf '%s\n' "${names[@]}"
 }
 
 function down() {
+    local host_ip
+    local host_ips
+
+    host_ips="$( (current_sim_host_ips; host_ips_from_hosts_block) | sort -u )"
+
     remove_all_sim_containers
 
     if docker network inspect "$SIM_NETWORK" >/dev/null 2>&1; then
@@ -195,6 +284,11 @@ function down() {
     if hosts_block_exists; then
         hosts_remove
     fi
+
+    while IFS= read -r host_ip; do
+        [ -z "$host_ip" ] && continue
+        remove_loopback_alias "$host_ip"
+    done <<< "$host_ips"
 }
 
 function status() {
@@ -223,7 +317,7 @@ function hosts_block_exists() {
 }
 
 function flush_host_cache() {
-    if [ "$(uname -s)" = "Darwin" ]; then
+    if is_darwin; then
         dscacheutil -flushcache >/dev/null 2>&1 || true
         killall -HUP mDNSResponder >/dev/null 2>&1 || true
     fi
@@ -232,6 +326,7 @@ function flush_host_cache() {
 function hosts() {
     local names=()
     local name
+    local host_ip
     local tmp_file
 
     while IFS= read -r name; do
@@ -248,7 +343,12 @@ function hosts() {
     {
         printf '%s\n' "$HOSTS_BEGIN"
         for name in "${names[@]}"; do
-            printf '127.0.0.1 %s.local %s\n' "$name" "$name"
+            host_ip="$(container_host_ip "$name")"
+            if [ -z "$host_ip" ]; then
+                echo "warning: could not find host IP label for $name" >&2
+                continue
+            fi
+            printf '%s %s.local %s\n' "$host_ip" "$name" "$name"
         done
         printf '%s\n' "$HOSTS_END"
     } >> "$tmp_file"
@@ -259,23 +359,180 @@ function hosts() {
 
     printf 'Installed simulator host aliases:\n'
     for name in "${names[@]}"; do
-        printf '  %s.local -> 127.0.0.1\n' "$name"
+        host_ip="$(container_host_ip "$name")"
+        printf '  %s.local -> %s\n' "$name" "${host_ip:-unknown}"
+    done
+}
+
+function start_mdns_bridge() {
+    local log_file="$1"
+
+    if [ ! -f "$SIM_MDNS_BRIDGE" ]; then
+        echo "mDNS bridge script not found: $SIM_MDNS_BRIDGE" >&2
+        return 1
+    fi
+
+    PYTHONUNBUFFERED=1 "$PYTHON" "$SIM_MDNS_BRIDGE" > "$log_file" 2>&1 &
+    printf '%s\n' "$!"
+}
+
+function start_sudo_keepalive() {
+    if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+        return
+    fi
+
+    sudo -v
+    while true; do
+        sudo -n -v >/dev/null 2>&1 || exit
+        sleep 60
+    done &
+    sudo_keepalive_pid="$!"
+}
+
+function service_status() {
+    local name="$1"
+    local service="$2"
+
+    docker exec "$name" systemctl is-active "$service" 2>/dev/null || printf 'unknown'
+}
+
+function host_port() {
+    local name="$1"
+    local container_port="$2"
+
+    docker port "$name" "$container_port" 2>/dev/null | sed 's/^[^:]*://' | head -1
+}
+
+function draw_status_ui() {
+    local names=("$@")
+    local name
+    local container_status
+    local watchdog_status
+    local autobahn_status
+    local watchdog_port
+    local autobahn_port
+    local ssh_port
+    local host_ip
+    local running=0
+    local total="${#names[@]}"
+
+    if [ -t 1 ]; then
+        printf '\033[2J\033[H'
+    fi
+
+    printf 'Blitz simulator running (%s nodes). Press Ctrl+C to stop and clean up.\n' "$total"
+    printf 'Host aliases and mDNS bridge are active while this process is running.\n\n'
+    printf '%-22s %-12s %-12s %-12s %-22s %-22s %-14s\n' \
+        'NAME' 'CONTAINER' 'WATCHDOG' 'AUTOBAHN' 'WATCHDOG URL' 'AUTOBAHN URL' 'SSH'
+
+    for name in "${names[@]}"; do
+        container_status="$(docker inspect -f '{{.State.Status}}' "$name" 2>/dev/null || printf 'missing')"
+        if [ "$container_status" = "running" ]; then
+            running=$((running + 1))
+        fi
+
+        watchdog_status="$(service_status "$name" blitz-startup)"
+        autobahn_status="$(service_status "$name" autobahn)"
+        watchdog_port="$(host_port "$name" 5000/tcp)"
+        autobahn_port="$(host_port "$name" 8080/tcp)"
+        ssh_port="$(host_port "$name" 22/tcp)"
+        host_ip="$(container_host_ip "$name")"
+
+        printf '%-22s %-12s %-12s %-12s %-22s %-22s %-14s\n' \
+            "$name" \
+            "$container_status" \
+            "$watchdog_status" \
+            "$autobahn_status" \
+            "http://$name.local:${watchdog_port:-5000}" \
+            "$name.local:${autobahn_port:-8080}" \
+            "${name}.local:${ssh_port:-22}"
+    done
+
+    printf '\nDocker nodes running: %s/%s\n' "$running" "$total"
+}
+
+function supervise() {
+    local names=()
+    local name
+    local mdns_pid=""
+    local sudo_keepalive_pid=""
+    local mdns_log=""
+    local cleanup_started=false
+
+    mdns_log="$(mktemp)"
+
+    function cleanup_supervisor() {
+        if [ "$cleanup_started" = true ]; then
+            return
+        fi
+        cleanup_started=true
+        trap - INT TERM HUP EXIT
+
+        printf '\nStopping simulator and cleaning host state...\n'
+
+        if [ -n "$mdns_pid" ] && kill -0 "$mdns_pid" >/dev/null 2>&1; then
+            kill "$mdns_pid" >/dev/null 2>&1 || true
+            wait "$mdns_pid" >/dev/null 2>&1 || true
+        fi
+
+        down
+
+        if [ -n "$sudo_keepalive_pid" ] && kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1; then
+            kill "$sudo_keepalive_pid" >/dev/null 2>&1 || true
+            wait "$sudo_keepalive_pid" >/dev/null 2>&1 || true
+        fi
+
+        rm -f "$mdns_log"
+        printf 'Simulator stopped.\n'
+    }
+
+    trap cleanup_supervisor INT TERM HUP EXIT
+
+    start_sudo_keepalive
+    down
+
+    while IFS= read -r name; do
+        [ -n "$name" ] && names+=("$name")
+    done < <(start_containers)
+
+    hosts
+    mdns_pid="$(start_mdns_bridge "$mdns_log")"
+
+    while true; do
+        draw_status_ui "${names[@]}"
+
+        if [ -n "$mdns_pid" ] && ! kill -0 "$mdns_pid" >/dev/null 2>&1; then
+            printf '\nERROR: mDNS bridge exited unexpectedly. Recent bridge log:\n' >&2
+            tail -20 "$mdns_log" >&2 || true
+            exit 1
+        fi
+
+        sleep "$SIM_STATUS_INTERVAL_SECONDS"
     done
 }
 
 function hosts_remove() {
     local tmp_file
+    local host_ips
+    local host_ip
 
     if ! hosts_block_exists; then
         echo "No simulator host aliases found in /etc/hosts."
         return
     fi
 
+    host_ips="$(host_ips_from_hosts_block)"
+
     tmp_file="$(mktemp)"
     write_hosts_without_sim_block > "$tmp_file"
     sudo cp "$tmp_file" /etc/hosts
     rm -f "$tmp_file"
     flush_host_cache
+
+    while IFS= read -r host_ip; do
+        [ -z "$host_ip" ] && continue
+        remove_loopback_alias "$host_ip"
+    done <<< "$host_ips"
 
     echo "Removed simulator host aliases from /etc/hosts."
 }
@@ -284,7 +541,7 @@ require_docker
 
 case "$COMMAND" in
     up)
-        up
+        supervise
         ;;
     down)
         down
