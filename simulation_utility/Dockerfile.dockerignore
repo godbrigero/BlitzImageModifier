@@ -1,0 +1,6 @@
+.git
+outputs
+installation/cached_images
+*.img
+*.img.xz
+.DS_Store

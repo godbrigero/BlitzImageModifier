@@ -1,5 +1,9 @@
+include simulation_utility/Makefile
+
 # First extra target is the device, e.g. "make build-for jetsonnano" -> ARGS=jetsonnano
-_device := $(firstword $(filter-out build-for build-all,$(MAKECMDGOALS)))
+ifneq ($(filter build-for,$(MAKECMDGOALS)),)
+  _device := $(firstword $(filter-out build-for,$(MAKECMDGOALS)))
+endif
 ifneq ($(_device),)
   ARGS := $(_device)
 else
@@ -21,6 +25,8 @@ build-all:
 build-for:
 	COMPILE_ALL=false FOR_X=$(ARGS) docker-compose up --build
 
-# Swallow extra goals so "make build-for jetsonnano" doesn't fail on "jetsonnano"
-$(filter-out build-for build-all,$(MAKECMDGOALS)):
+# Swallow the device goal so "make build-for jetsonnano" does not fail on "jetsonnano".
+ifneq ($(_device),)
+$(_device):
 	@:
+endif
