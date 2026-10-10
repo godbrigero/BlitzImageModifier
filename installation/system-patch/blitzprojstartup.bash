@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-INSTALLATION_DIR="/opt/blitz"
+INSTALLATION_DIR="${BLITZ_INSTALLATION_DIR:-/opt/blitz}"
+HOSTS_PATH="${BLITZ_HOSTS_PATH:-/etc/hosts}"
 NAME_PATH="$INSTALLATION_DIR/B.L.I.T.Z/system_data/name.txt"
 
 if [ ! -f "$NAME_PATH" ]; then
@@ -19,13 +20,13 @@ fi
 function get_name() {
     read -p "Enter a name for the Blitz Pi: " NEW_NAME
     if [[ "$NEW_NAME" =~ [^a-zA-Z0-9_-] ]]; then
-        echo "Name can only contain letters, numbers, underscores, or hyphens. Try again."
+        echo "Name can only contain letters, numbers, underscores, or hyphens. Try again." >&2
         get_name
         return
     fi
 
     if [[ -z "$NEW_NAME" ]]; then
-        echo "Name cannot be empty. Try again."
+        echo "Name cannot be empty. Try again." >&2
         get_name
         return
     fi
@@ -38,7 +39,7 @@ NEW_NAME=$(get_name)
 echo "$NEW_NAME" | tee "$NAME_PATH" >/dev/null
 
 hostnamectl set-hostname "$NEW_NAME"
-grep -q "^127.0.1.1[[:space:]]\+$NEW_NAME$" /etc/hosts || echo "127.0.1.1 $NEW_NAME" | tee -a /etc/hosts >/dev/null
+grep -q "^127.0.1.1[[:space:]]\+$NEW_NAME$" "$HOSTS_PATH" || echo "127.0.1.1 $NEW_NAME" | tee -a "$HOSTS_PATH" >/dev/null
 systemctl restart avahi-daemon
 systemctl restart ssh
 

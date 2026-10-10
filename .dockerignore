@@ -1,1 +1,7 @@
 outputs
+installation/cached_images
+.git
+**/__pycache__
+.pytest_cache
+*.img
+*.img.xz

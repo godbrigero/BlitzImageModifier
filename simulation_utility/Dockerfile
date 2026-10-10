@@ -1,5 +1,10 @@
 FROM ubuntu:24.04
 
+ARG BLITZ_REF=HEAD
+ARG BLITZ_GIT_URL=https://github.com/PinewoodRobotics/B.L.I.T.Z.git
+ENV BLITZ_REF=${BLITZ_REF}
+ENV BLITZ_GIT_URL=${BLITZ_GIT_URL}
+
 ENV container=docker
 ENV DEBIAN_FRONTEND=noninteractive
 ENV BLITZ_USER=ubuntu

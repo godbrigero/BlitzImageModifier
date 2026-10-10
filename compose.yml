@@ -1,14 +1,15 @@
-version: "3.8"
-
 services:
   blitz_compilation:
     build:
       context: .
       args:
-        - COMPILE_ALL=${COMPILE_ALL}
-        - FOR_X=${FOR_X}
+        - COMPILE_ALL=${COMPILE_ALL:-false}
+        - FOR_X=${FOR_X:-pi5}
     privileged: true
     environment:
+      BLITZ_SOURCE_DIR: ${BLITZ_SOURCE_DIR:+/blitz-source}
+      BLITZ_REF: ${BLITZ_REF:-HEAD}
+      BLITZ_GIT_URL: ${BLITZ_GIT_URL:-https://github.com/PinewoodRobotics/B.L.I.T.Z.git}
       BLITZ_USER: ${BLITZ_USER:-ubuntu}
       BLITZ_PASSWORD: ${BLITZ_PASSWORD:-ubuntu}
       BLITZ_UID: ${BLITZ_UID:-1000}
@@ -16,6 +17,7 @@ services:
     stdin_open: true
     volumes:
       - .:/host
+      - ${BLITZ_SOURCE_DIR:-.}:/blitz-source:ro
     tty: true
     ports:
       - "6756:6756"

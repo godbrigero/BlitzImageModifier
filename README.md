@@ -81,9 +81,9 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
   - Runs `provision_user.bash` to create the target image user during compilation
   - Runs hardware script `pi5.bash` (installs udev rule)
   - Runs `installation_common.bash` (packages, Rust, SSH/mDNS enable)
-  - Runs `installation_blitz.bash` (clones B.L.I.T.Z, `scripts/install.bash` with default name)
+  - Runs `installation_blitz.bash` (clones B.L.I.T.Z, `scripts/ui/install_on_system.sh` from the same checkout, with default name)
   - Runs `installation_autobahn.bash` (clones Autobahn, installs)
-  - Runs `post_install.bash` (installs and enables first-boot service)
+  - Runs `install_startup.bash` (installs first-boot naming)
   - Runs `finalize_permissions.bash` so `/opt/blitz` is owned by the target user
 
 - `export_image_and_compress.bash`
@@ -93,7 +93,7 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 ## First boot behavior
 
 - The login account is already created during image compilation, before flashing.
-- A systemd service (`blitz_project.service`) runs `/usr/local/bin/blitzprojstartup.bash`.
+- The login shell invokes `/usr/local/bin/blitzprojstartup.bash` for first-boot naming.
 - On first boot, if the default name is still set, it will prompt on the console for a new device name and apply it (`hostnamectl`, `/etc/hosts`, restart Avahi/SSH), then reboot.
   - If you need a non-interactive first boot, pre-create `name.txt` inside the image at:
     - `/opt/blitz/B.L.I.T.Z/system_data/name.txt`
@@ -104,7 +104,7 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 - **Extra space**: in `Dockerfile` (`truncate -s +4G ...`). Increase if you need more room preinstalled.
 - **Hardware script**: currently `main_startup.bash` runs `pi5.bash`. Add your own script and change the argument in `setup_image.bash` (`main_startup.bash <your-script>.bash`).
 - **Target image user**: pass `BLITZ_USER`, `BLITZ_PASSWORD`, `BLITZ_UID`, or `BLITZ_GID` to `make`. Defaults are `ubuntu`, `ubuntu`, `1000`, and `1000`.
-- **B.L.I.T.Z branch**: in `installation_blitz.bash` (`BRANCH_NAME="merge-backend"`). Change as needed.
+- **BLITZ revision**: pass `BLITZ_REF=<branch/tag/commit>` to `make build-for pi5` or `make sim-build`. The installer and runtime use that same checkout. A commit SHA gives reproducible builds; `HEAD` follows upstream.
 - **Default device name**: `installation_blitz.bash` (`DEFAULT_PI_NAME`). This is used on first boot before prompting.
 - **udev rules**: edit `installation/system-patch/90-usb-port-names.rules` or adapt `pi5.bash` to your hardware.
 - **Output filename**: `export_image_and_compress.bash` is invoked with `pi5_flash_image` by default (from `Dockerfile CMD`). Change it if you want a different name.
@@ -156,3 +156,93 @@ rm -f outputs/*.img outputs/*.img.xz
 ## License
 
 Add a license here (e.g., MIT, Apache-2.0) if applicable.
+
+## Updated BLITZ deployment integration
+
+Images require BLITZ deployment **1.2.0 or later**. Image creation checks the module
+catalog, typed launch contracts, watchdog discovery, installation root, and offline
+transfer tools. An older or incompatible source checkout fails the build with an
+error. Changes in your local BLITZ repository must be published before using a
+remote revision; selecting a branch does not include uncommitted changes.
+
+```bash
+make build-for pi5 BLITZ_SOURCE_DIR=/path/to/your/updated/BLITZ
+# Or use an already-published revision:
+make build-for pi5 BLITZ_REF=<published-commit>
+make sim-build BLITZ_REF=<published-commit>
+```
+
+For Pi image builds, `make build-for pi5 BLITZ_SOURCE_DIR=/path/to/BLITZ` mounts
+the host source read-only into the build container and chroot. The installer
+also accepts `BLITZ_SOURCE_DIR` directly inside a prepared build environment. It copies working-tree changes and excludes virtual environments,
+build artifacts, website files, `.env` files, and the developer's device name.
+This option is for an environment where the source is already mounted; passing a
+host path to `make sim-build` does not mount that path automatically.
+
+The target layout stays:
+
+```text
+/opt/blitz/B.L.I.T.Z/
+├── .venv/                 # Shared Python environment, provisioned online
+├── watchdog/             # Target process manager
+├── system_data/           # Device name and watchdog configuration
+└── backend/               # One active backend bundle
+    ├── deployment/        # Preserved deployment tooling
+    ├── python/<module>/
+    ├── cpp/<module>/
+    ├── rust/<module>/
+    ├── lib/<module>/      # Namespaced compiled libraries
+    └── resources/<module>/
+```
+
+The image is provisioned online once. Application dependency compilation and
+Docker caching happen on the developer's computer; the target receives bundles
+and installs Python dependencies from bundled wheels offline. Module programs
+receive runtime paths through environment variables and require no BLITZ CLI flags
+by default. `BLITZ_USER` also selects the watchdog service account, matching the
+ownership established by `finalize_permissions.bash`.
+
+The simulator bridge obtains discovery properties from the installed watchdog,
+including distro, Python version, architecture, and CUDA capabilities. The
+simulator describes its own Linux container, not Raspberry Pi hardware or a real
+NVIDIA GPU. You can select it directly without mDNS:
+
+```bash
+# In your application project, using that project's updated deploy.py:
+.venv/bin/python backend/deploy.py --device blitz-sim-1.local:5000
+```
+
+Integration regression tests (using BLITZ's test environment):
+
+```bash
+BLITZ_SOURCE_DIR=/path/to/BLITZ /path/to/BLITZ/.venv/bin/python -m pytest tests/ -q
+```
+
+To recheck an installed image, run from its BLITZ root with the image modifier's
+`installation/util/check_blitz_runtime.py` available:
+
+```bash
+BLITZ_PATH="$PWD" .venv/bin/python /workspace/installation/util/check_blitz_runtime.py
+```
+
+### Pi 5 build verification
+
+The Bookworm image's boot partition is mounted at `/boot/firmware` during
+provisioning. Services are enabled for first boot; start/reload commands run only
+when a systemd manager is available. Chroot DNS overrides are restored before
+export, and failed setup cleans up the mounts and loop device it created.
+
+The final `validate_image.bash` check verifies watchdog startup imports, enabled
+SSH/mDNS/watchdog/Autobahn services, the Autobahn executable/configuration,
+startup naming, and ownership by the configured login user. A successful image
+build still does not prove hardware boot, USB peripherals, or the device's actual
+network connection; those require flashing and booting a Pi.
+
+See [Pi 5 validation results](docs/Pi5-validation.md) for the actual image build,
+exported-image runtime checks, and remaining hardware checks.
+
+## Pi 5 header and CSI camera support
+
+Pi 5 builds now enable GPIO/I2C/SPI access and CSI camera auto-detection, install
+Picamera2/libcamera, and expose their native Python bindings to the shared BLITZ
+environment. See [Pi 5 hardware setup and examples](docs/Pi5-hardware.md).

@@ -34,6 +34,7 @@ fi
     libclang-dev \
     sshpass \
     rsync \
+    unzip \
     udev \
     avahi-daemon \
     avahi-utils \
@@ -52,11 +53,12 @@ pyenv global 3.12.6
 pip install opencv-python
 
 "${SUDO[@]}" systemctl enable ssh
-"${SUDO[@]}" systemctl start ssh
-"${SUDO[@]}" systemctl status ssh
 
 "${SUDO[@]}" systemctl enable avahi-daemon
-"${SUDO[@]}" systemctl start avahi-daemon
+# Enable units for first boot; a chroot has no running systemd manager.
+if systemctl is-system-running >/dev/null 2>&1; then
+    "${SUDO[@]}" systemctl start ssh avahi-daemon
+fi
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"

@@ -21,7 +21,9 @@ umount -lf "$MOUNT_POINT/dev/pts" || true
 umount -lf "$MOUNT_POINT/dev" || true
 umount -lf "$MOUNT_POINT/proc" || true
 umount -lf "$MOUNT_POINT/sys" || true
+umount -lf "$MOUNT_POINT/blitz-source" || true
 umount -lf "$MOUNT_POINT/workspace" || true
+umount -lf "$MOUNT_POINT/boot/firmware" || true
 umount -lf "$MOUNT_POINT/boot" || true
 umount -lf "$MOUNT_POINT" || true
 

@@ -1,3 +1,5 @@
+BLITZ_REF ?= HEAD
+BLITZ_GIT_URL ?= https://github.com/PinewoodRobotics/B.L.I.T.Z.git
 SIM_IMAGE ?= blitz-sim:latest
 SIM_NETWORK ?= blitz-sim
 SIM_CONTAINER_PREFIX ?= blitz-sim
@@ -20,7 +22,7 @@ SIM_MDNS_BRIDGE := $(SIM_DIR)mdns_bridge.py
 .PHONY: sim-build sim-up sim-down sim-status sim-logs sim-shell sim-hosts sim-hosts-remove sim-clean-hosts sim-mdns
 
 sim-build:
-	docker build -f "$(SIM_DOCKERFILE)" -t "$(SIM_IMAGE)" .
+	docker build --build-arg BLITZ_REF="$(BLITZ_REF)" --build-arg BLITZ_GIT_URL="$(BLITZ_GIT_URL)" -f "$(SIM_DOCKERFILE)" -t "$(SIM_IMAGE)" .
 
 sim-up:
 	SIM_IMAGE="$(SIM_IMAGE)" \
