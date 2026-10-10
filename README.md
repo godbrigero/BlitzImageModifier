@@ -22,6 +22,11 @@ retry behavior, and validation limits.
 
 ## Prerequisites
 
+Optional: [Pi 5 offline Wi-Fi router](docs/Pi5-router.md) explains how to enable
+a custom password-protected access point and a wired Jetson LAN with
+`BLITZ_ROUTER_ENABLED=true`. This can be configured on an existing Pi without
+reflashing, or included during image creation.
+
 - Docker Engine (or Docker Desktop) and Docker Compose
 - Host OS: Linux recommended; macOS with Docker Desktop also works (runs in a Linux VM under the hood). Windows WSL2 with Docker may work as well.
 - Sufficient disk space (downloaded image + expanded working set; plan for ~10–15 GB)

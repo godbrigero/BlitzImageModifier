@@ -45,7 +45,10 @@ flowchart TD
     PY -->|Other targets| PJ["Use distro Python if >= 3.11<br/>Otherwise build managed Python 3.12.6"]
     PS --> H["Pi 5 only: hardware packages,<br/>groups, boot settings and GPIO rules"]
     PJ --> B["Select BLITZ checkout"]
-    H --> B
+    H --> RT{"Optional Pi router enabled?"}
+    RT -->|Yes| RP["Prepare Wi-Fi AP + Ethernet bridge<br/>DHCP; activate at boot"]
+    RP --> B
+    RT -->|No| B
     B --> V["Validate installer paths<br/>and deployment version >= 1.2.0"]
     V --> E["Create/repair target .venv<br/>Pi exposes distro site packages"]
     E --> G["Install BLITZ and compatible grpcio-tools<br/>Use venv protoc for generation"]
@@ -158,6 +161,9 @@ loaded at boot. The Pi's separate GPIO/camera permission rule also remains.
   export uses a temporary file before replacing the completed output.
 
 ## Relationship to deployment
+
+The optional [Pi 5 router mode](Pi5-router.md) puts the wired Jetson and Wi-Fi
+controller on the same offline LAN. It requires no upstream internet connection.
 
 ```mermaid
 flowchart LR

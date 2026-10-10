@@ -5,3 +5,5 @@ installation/cached_images
 .pytest_cache
 *.img
 *.img.xz
+.env
+.env.*

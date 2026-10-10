@@ -50,4 +50,14 @@ if [ "${BLITZ_DEVICE:-}" = pi5 ]; then
     test -r /etc/udev/rules.d/99-blitz-pi5-hardware.rules
     echo "Pi 5 hardware settings and permissions verified (device detection requires boot)"
 fi
+if [ "${BLITZ_ROUTER_ENABLED:-false}" = true ]; then
+    systemctl is-enabled NetworkManager >/dev/null
+    systemctl is-enabled blitz-router-regdomain >/dev/null
+    for profile in /etc/NetworkManager/system-connections/blitz-router-{lan,wifi,ethernet-0}.nmconnection; do
+        test -s "$profile"
+        test "$(stat -c '%a' "$profile")" = 600
+        test "$(stat -c '%U' "$profile")" = root
+    done
+    echo "Pi router profiles and boot services verified (Wi-Fi activation requires reboot)"
+fi
 echo "Image runtime, services, ownership, and module launch verified"

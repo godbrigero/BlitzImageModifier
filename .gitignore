@@ -2,3 +2,5 @@ outputs/
 .DS_Store
 installation/cached_images/
 *.pyc
+.env
+.env.*

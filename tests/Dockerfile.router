@@ -1,0 +1,5 @@
+FROM debian:12
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    network-manager dnsmasq-base iptables python3 iproute2 iputils-ping isc-dhcp-client dbus
+COPY installation/util/configure_pi5_router.py /configure_pi5_router.py
+CMD ["sleep", "infinity"]

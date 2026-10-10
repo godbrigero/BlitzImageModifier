@@ -25,6 +25,7 @@ bash ./installation_common.bash
 if [ "${BLITZ_DEVICE:-}" = pi5 ]; then
     bash ./installation_pi5_hardware.bash
 fi
+bash ./installation_pi5_router.bash
 
 # Install BLITZ software
 bash ./installation_blitz.bash
