@@ -1,32 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-bash ./installation/modules/installation_common.bash
+# Resolve paths from this file so invoking it outside the repository also works.
+REPOSITORY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPOSITORY_DIR"
+export BLITZ_USER="${BLITZ_USER:-$(id -un)}"
+if [ "$BLITZ_USER" = root ]; then
+    echo "Run this script as your normal Jetson login user, without sudo." >&2
+    exit 1
+fi
+export BLITZ_RESUME_INSTALL=true
+export BLITZ_DEVICE=jetson
+trap 'status=$?; echo "Jetson installation failed at line $LINENO (exit $status). Fix the reported error and rerun this script; existing BLITZ source is preserved." >&2; exit "$status"' ERR
 
-sudo mkdir -p /opt/blitz/
-sudo chmod -R a+rw /opt/blitz/
+bash ./installation/modules/main_startup.bash
 
-bash ./installation/modules/installation_blitz.bash
-bash ./installation/modules/installation_autobahn.bash
-
-
-#### STARTUP
-sudo mv ./installation/system-patch/blitzprojstartup.bash /usr/local/bin/
-sudo chmod +x /usr/local/bin/blitzprojstartup.bash
-echo "sudo /usr/local/bin/blitzprojstartup.bash" | sudo tee -a /etc/bash.bashrc
-# bash ./installation/modules/install_startup.bash
-#### END STARTUP
-
-
-#### USB PORT NAMING
-sudo rm -f /etc/udev/rules.d/90-usb-port-names.rules
-sudo cp ./installation/system-patch/90-usb-port-names-jetson.rules /etc/udev/rules.d/90-usb-port-names.rules
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-#### END USB PORT NAMING
-
-
-sudo chmod -R a+rw /opt/blitz/
 
 mkdir -p ~/.config/autostart
 
@@ -39,4 +27,8 @@ OnlyShowIn=GNOME;
 X-GNOME-Autostart-enabled=true
 EOF
 
-sudo reboot
+if [ "${BLITZ_REBOOT:-true}" = true ]; then
+    sudo reboot
+else
+    echo "Jetson setup completed. Reboot when ready."
+fi

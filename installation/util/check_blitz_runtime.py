@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 import shutil
+import platform
 
 
 def check_runtime(root: Path) -> str:
@@ -33,7 +34,8 @@ def check_runtime(root: Path) -> str:
     discovered = DiscoveredNetworkSystem.collect()
     if Path(discovered.blitz_path).resolve() != root:
         raise RuntimeError("Watchdog discovery advertises a different installation root")
-    for name in ("rsync", "unzip", "ssh"):
+    tools = ("rsync", "unzip", "ssh", "ip") if platform.system() == "Linux" else ("rsync", "unzip", "ssh")
+    for name in tools:
         if shutil.which(name) is None:
             raise RuntimeError(f"Missing offline deployment tool: {name}")
     return version

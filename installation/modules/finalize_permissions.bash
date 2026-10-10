@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BLITZ_USER="${BLITZ_USER:-ubuntu}"
-INSTALLATION_DIR="/opt/blitz"
+INSTALLATION_DIR="${BLITZ_INSTALLATION_DIR:-/opt/blitz}"
 
 if ! getent passwd "$BLITZ_USER" >/dev/null; then
     echo "Cannot finalize permissions: user $BLITZ_USER does not exist." >&2

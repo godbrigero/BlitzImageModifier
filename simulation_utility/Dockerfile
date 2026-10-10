@@ -40,6 +40,11 @@ RUN printf '%s\n' \
     '  is-system-running)' \
     '    exit 1' \
     '    ;;' \
+    '  is-enabled)' \
+    '    unit="$1"; case "$unit" in *.service) ;; *) unit="${unit}.service" ;; esac' \
+    '    test -L "/etc/systemd/system/multi-user.target.wants/$unit"' \
+    '    exit $?' \
+    '    ;;' \
     '  enable)' \
     '    mkdir -p /etc/systemd/system/multi-user.target.wants' \
     '    for unit in "$@"; do' \
@@ -77,11 +82,7 @@ COPY simulation_utility/entrypoint.bash /usr/local/bin/blitz-sim-entrypoint.bash
 
 RUN chmod +x /usr/local/bin/blitz-sim-entrypoint.bash \
     && cd /workspace/installation/modules \
-    && bash ./provision_user.bash \
-    && bash ./installation_common.bash \
-    && bash ./installation_blitz.bash \
-    && bash ./installation_autobahn.bash \
-    && bash ./finalize_permissions.bash \
+    && BLITZ_IMAGE_BUILD=true BLITZ_DEVICE=linux bash ./main_startup.bash \
     && mkdir -p /etc/systemd/system/multi-user.target.wants \
     && for unit in blitz-startup.service autobahn.service ssh.service avahi-daemon.service; do \
         found=""; \

@@ -10,13 +10,32 @@ BLITZ_PATH="$ROOT" .venv/bin/python -c 'import watchdog.__main__; print("Watchdo
 for service in blitz-startup autobahn ssh avahi-daemon; do
     systemctl is-enabled "$service" >/dev/null
     echo "First-boot service enabled: $service"
+    if systemctl is-system-running >/dev/null 2>&1 || \
+    [ "$(systemctl is-system-running 2>/dev/null || true)" = degraded ]; then
+        sudo systemctl is-active "$service" >/dev/null || {
+            sudo systemctl status "$service" --no-pager >&2 || true
+            sudo journalctl -u "$service" -n 40 --no-pager >&2 || true
+            exit 1
+        }
+    fi
 done
+
+if systemctl is-system-running >/dev/null 2>&1 || \
+    [ "$(systemctl is-system-running 2>/dev/null || true)" = degraded ]; then
+    if ! BLITZ_PATH="$ROOT" .venv/bin/python "$SCRIPT_DIR/../util/check_watchdog_http.py"; then
+        sudo journalctl -u blitz-startup -n 40 --no-pager >&2 || true
+        exit 1
+    fi
+fi
 
 test -x /usr/local/bin/autobahn
 test -r /etc/autobahn/config.toml
 grep -qxF "User=${BLITZ_USER:-ubuntu}" /etc/systemd/system/blitz-startup.service
 test "$(stat -c '%U' "$ROOT")" = "${BLITZ_USER:-ubuntu}"
 test -x /usr/local/bin/blitzprojstartup.bash
+if [ "${BLITZ_DEVICE:-}" = pi5 ] || [ "${BLITZ_DEVICE:-}" = jetson ]; then
+    test -r /etc/udev/rules.d/90-usb-port-names.rules
+fi
 sudo -u "${BLITZ_USER:-ubuntu}" env BLITZ_PATH="$ROOT" .venv/bin/python "$SCRIPT_DIR/../util/smoke_blitz_module.py"
 if [ "${BLITZ_DEVICE:-}" = pi5 ]; then
     sudo -u "${BLITZ_USER:-ubuntu}" .venv/bin/python -c 'import os, tempfile; temporary = tempfile.TemporaryDirectory(prefix="blitz-hardware-import-"); os.chdir(temporary.name); import picamera2, libcamera, gpiozero, lgpio, gpiod, smbus, spidev; print("Pi camera and GPIO Python bindings verified in BLITZ venv")'

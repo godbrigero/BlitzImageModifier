@@ -9,7 +9,7 @@ Validation performed on 2026-10-09 using the local updated BLITZ checkout.
 - Inspected the exported image in a read-only ARM64 chroot with temporary writable
   storage for the module smoke test.
 - Confirmed Debian 12, ARM64, glibc 2.36, and the watchdog's Python 3.11 environment.
-  The additional pyenv Python installation does not change this system-Python
+  The Pi installer uses distro Python without installing an additional pyenv
   virtual environment; deployment uses the version advertised by watchdog.
 - Verified imports of the watchdog entrypoint and the updated deployment APIs.
 - Verified enabled watchdog, Autobahn, SSH, and Avahi units, runtime ownership,

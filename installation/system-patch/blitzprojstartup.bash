@@ -3,7 +3,11 @@ set -euo pipefail
 
 INSTALLATION_DIR="${BLITZ_INSTALLATION_DIR:-/opt/blitz}"
 HOSTS_PATH="${BLITZ_HOSTS_PATH:-/etc/hosts}"
-NAME_PATH="$INSTALLATION_DIR/B.L.I.T.Z/system_data/name.txt"
+if [ -z "${BLITZ_INSTALLATION_DIR:-}" ] && [ -z "${BLITZ_PATH:-}" ] && [ -r /etc/default/blitz ]; then
+    # sudo may clear the login shell's environment; recover the installed root.
+    . /etc/default/blitz
+fi
+NAME_PATH="${BLITZ_PATH:-$INSTALLATION_DIR/B.L.I.T.Z}/system_data/name.txt"
 
 if [ ! -f "$NAME_PATH" ]; then
     echo "name.txt not found at $NAME_PATH; creating it."

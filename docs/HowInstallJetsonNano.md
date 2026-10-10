@@ -1,5 +1,8 @@
 # Jetson Nano installation instructions
 
+These image links are for **Jetson Orin Nano**, not the original Jetson Nano.
+Use the NVIDIA image appropriate to your actual board.
+
 # Step 1: install the base image
 
 use either this link with instructions:
@@ -22,10 +25,10 @@ Plug in the SD card into the Jetson Nano and power it on. Note that you will nee
 2. Select "English" as the language
 3. Select "English (US)" as the keyboard layout
 4. Select "Los Angeles" as the time zone
-5. Name the device "ubuntu"
-6. Name the computer "ubuntu"
-7. Name the username "ubuntu"
-8. Set the password to "ubuntu"
+5. Choose a device/display name.
+6. Choose a computer hostname.
+7. Choose your normal login username, such as `jetson`.
+8. Set your login password. The live installer preserves your account/password.
 9. In the "APP Partition Size" field set the maximum accepted size. So if it says "Current size: 21386 MB, Maximum size: 59412 MB." then set it to "59412".
 10. Do not install chromium browser.
 
@@ -52,12 +55,42 @@ git clone https://github.com/PinewoodRobotics/BlitzImageModifier.git
 
 3. cd into the BlitzImageModifier repository and run the jetson_nano.bash script:
 
-**Please note that if there is ANY errors popping up (especially with relation to something like not being able to aquire a lock for something), try rebooting the Jetson Nano and try again.**
+Run as your normal login user (for example `jetson`), **without sudo**. The
+script elevates individual system operations and uses that login user for the
+watchdog service. Do not rename or replace your existing user with `ubuntu`.
+
+Update ImageModifier before installation; old copies downloaded an installer
+separately from BLITZ and could fail with `scripts/install.sh: No such file or directory`.
 
 ```bash
 cd BlitzImageModifier
+git pull --ff-only
 bash ./installation/extra/jetson_nano.bash
 ```
+
+### Retrying the missing installer failure
+
+After updating ImageModifier, rerun the same command. The Jetson script reuses
+an existing BLITZ checkout without deleting it, preserves an existing device
+name, skips rebuilding an already installed Python version, and reuses the
+Autobahn source folder. The installed BLITZ tree must contain
+`scripts/ui/install_on_system.sh`, `scripts/setup.sh`, and the current module API.
+An incompatible tree fails with an explicit upgrade instruction.
+
+If `/opt/blitz/B.L.I.T.Z` is an older **Git checkout**, update that checkout to
+the intended current BLITZ revision first. For an unmodified checkout tracking
+its normal branch, this can be done with:
+
+```bash
+git -C /opt/blitz/B.L.I.T.Z status --short
+git -C /opt/blitz/B.L.I.T.Z pull --ff-only
+bash ./installation/extra/jetson_nano.bash
+```
+
+Preserve local changes before updating; do not delete the folder or force-reset
+it. A detached or locally copied checkout needs your usual BLITZ updater or an
+explicit revision update. Resume preserves that checkout; `BLITZ_REF` and
+`BLITZ_SOURCE_DIR` only select source for a fresh installation.
 
 4. Post-install:
 

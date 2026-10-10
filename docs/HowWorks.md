@@ -1,5 +1,8 @@
 # How This Project Works and How to Customize It
 
+For the current shared installation flow, source selection, Python policy,
+USB rules, and retry/validation behavior, see [installation dataflow](Installation-dataflow.md).
+
 This project builds a Raspberry Pi OS image that already has the Pinewood Robotics software stack installed (B.L.I.T.Z + Autobahn), plus some device-specific system setup.
 
 The important idea is: **do all the image editing inside Docker**, using QEMU so we can chroot into an ARM64 Raspberry Pi OS image from an x86_64 machine.

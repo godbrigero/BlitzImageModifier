@@ -2,19 +2,23 @@
 
 #### Disclaimer: README is written by AI and reviewed by me.
 
-Create a preconfigured Raspberry Pi OS image (Pi 5, Bookworm arm64) with the Pinewood Robotics B.L.I.T.Z stack and Autobahn preinstalled. The build runs entirely inside Docker using QEMU, expands the base image, chroots into it to install packages and services, and then exports a compressed `.img.xz` ready to flash.
+Create a preconfigured Raspberry Pi OS image (Pi 5, Bookworm arm64) with the Pinewood Robotics B.L.I.T.Z stack and Autobahn preinstalled. The build runs inside Docker using QEMU, expands the base image, installs packages and services in a chroot, and exports a flashable `.img`. Compression is optional.
 
 ### What this does
 
+See [installation dataflow](docs/Installation-dataflow.md) for the shared Pi 5,
+Jetson, and live Linux installation stages, Python packages, USB naming rules,
+retry behavior, and validation limits.
+
 - **Downloads** Raspberry Pi OS Lite (arm64 Bookworm) base image
-- **Expands** the image filesystem to add space (+4 GB by default)
+- **Expands** the image filesystem to add space (+6G by default)
 - **Chroots** into the image using QEMU to install software
 - **Installs** common system deps, Rust toolchain, SSH, mDNS
-- **Installs** B.L.I.T.Z (branch `merge-backend`) and Autobahn
+- **Installs** B.L.I.T.Z from `BLITZ_REF` (default `HEAD`) or local source, and Autobahn
 - **Creates** the target login user inside the image before export (`ubuntu` / `ubuntu` by default)
 - **Applies** USB udev naming rules and enables required services
-- **Configures** a first-boot service that asks for a device name
-- **Exports** and **compresses** the final image to `outputs/`
+- **Configures** a first-login naming script
+- **Exports** the final image to `outputs/`
 
 ## Prerequisites
 
@@ -36,7 +40,7 @@ docker compose up --build
 When the pipeline finishes, your output will be in:
 
 ```bash
-outputs/pi5_flash_image.img.xz
+outputs/pi5_flash_image.img
 ```
 
 The generated image includes a pre-created user account:
@@ -55,8 +59,6 @@ make build-for pi5 BLITZ_USER=myuser BLITZ_PASSWORD=mypass
 You can then flash it to a microSD card (Linux example):
 
 ```bash
-xz -d outputs/pi5_flash_image.img.xz
-
 # Replace /dev/sdX with your target device (DANGER: double-check!)
 sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fsync
 ```
@@ -66,29 +68,31 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 - `Dockerfile`
 
   - Based on `ubuntu:24.04`, installs tooling (qemu-user-static, kpartx, parted, e2fsprogs, etc.)
-  - Downloads `raspios-bookworm-arm64-lite` and expands the image by 4 GB
-  - Entrypoint runs `setup_image.bash` then `export_image_and_compress.bash`
+  - Entrypoint runs `installation/devices_and_distros/build.bash`
+  - That script selects/downloads the base image, expands it, runs setup, and exports it
 
 - `setup_image.bash`
 
   - Attaches loop devices, fixes/extends partitions, runs `resize2fs`
   - Mounts the image (root and boot), binds `/dev`, `/proc`, `/sys`, `/workspace`
   - Copies `qemu-aarch64-static` into the chroot for ARM emulation
-  - Chroots into the image and runs `main_startup.bash pi5.bash`
+  - Chroots into the image and runs `pi5.bash`, which calls `main_startup.bash`
 
 - Inside the chroot (`main_startup.bash`)
 
   - Runs `provision_user.bash` to create the target image user during compilation
-  - Runs hardware script `pi5.bash` (installs udev rule)
+  - Uses the Pi settings supplied by `pi5.bash`
   - Runs `installation_common.bash` (packages, Rust, SSH/mDNS enable)
   - Runs `installation_blitz.bash` (clones B.L.I.T.Z, `scripts/ui/install_on_system.sh` from the same checkout, with default name)
   - Runs `installation_autobahn.bash` (clones Autobahn, installs)
   - Runs `install_startup.bash` (installs first-boot naming)
+  - Runs `install_device_rules.bash` (preserves USB naming and reloads live udev)
   - Runs `finalize_permissions.bash` so `/opt/blitz` is owned by the target user
+  - Runs `validate_image.bash` to verify runtime, services, ownership, and module execution
 
 - `export_image_and_compress.bash`
   - Cleanly unmounts/breaks down loop/mapper devices
-  - Renames the image, compresses to `.img.xz`, and copies into `./outputs/`
+  - Copies the completed image into `./outputs/`, with optional `.xz` compression
 
 ## First boot behavior
 
@@ -100,14 +104,14 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 
 ## Customization
 
-- **Base image version**: in `Dockerfile` (`wget` URL). Update to a newer Raspberry Pi OS image if desired.
-- **Extra space**: in `Dockerfile` (`truncate -s +4G ...`). Increase if you need more room preinstalled.
-- **Hardware script**: currently `main_startup.bash` runs `pi5.bash`. Add your own script and change the argument in `setup_image.bash` (`main_startup.bash <your-script>.bash`).
+- **Base image version**: `installation/devices_and_distros/devices.conf` selects the filename and URL.
+- **Extra space**: `installation/devices_and_distros/build.bash` uses its fourth argument, default `6G`.
+- **Hardware script**: add a device script and matching image configuration under `installation/devices_and_distros/`; use the shared installation stages.
 - **Target image user**: pass `BLITZ_USER`, `BLITZ_PASSWORD`, `BLITZ_UID`, or `BLITZ_GID` to `make`. Defaults are `ubuntu`, `ubuntu`, `1000`, and `1000`.
 - **BLITZ revision**: pass `BLITZ_REF=<branch/tag/commit>` to `make build-for pi5` or `make sim-build`. The installer and runtime use that same checkout. A commit SHA gives reproducible builds; `HEAD` follows upstream.
 - **Default device name**: `installation_blitz.bash` (`DEFAULT_PI_NAME`). This is used on first boot before prompting.
-- **udev rules**: edit `installation/system-patch/90-usb-port-names.rules` or adapt `pi5.bash` to your hardware.
-- **Output filename**: `export_image_and_compress.bash` is invoked with `pi5_flash_image` by default (from `Dockerfile CMD`). Change it if you want a different name.
+- **udev rules**: edit the profile's rule in `installation/system-patch/`; `install_device_rules.bash` installs it and reloads live udev.
+- **Output filename**: `build.bash` supplies `<device>_flash_image` to the export script.
 
 ## Directory overview
 
@@ -117,15 +121,15 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 - `main_startup.bash`: Orchestrates installs and setup inside the chroot
 - `provision_user.bash`: Creates the target login account inside the image
 - `finalize_permissions.bash`: Makes `/opt/blitz` owned by the target login account
-- `pi5.bash`: Installs udev rule for USB port naming
+- `pi5.bash`: Selects Pi image/account/Python settings and invokes the shared installer
+- `install_device_rules.bash`: Installs Pi/Jetson USB port naming rules
 - `installation_common.bash`: Common packages, Rust toolchain, SSH/mDNS enable
 - `installation_blitz.bash`: Clones/installs B.L.I.T.Z
 - `installation_autobahn.bash`: Clones/installs Autobahn
-- `post_install.bash`: Installs and enables first-boot naming service
-- `blitz_project.service`: systemd unit for first-boot naming
+- `install_startup.bash`: Installs the first-login naming script and shell hook
 - `blitzprojstartup.bash`: prompts for device name on first boot
 - `export_image_and_compress.bash`: unmounts, compresses, and copies output
-- `outputs/`: final `.img.xz` artifacts
+- `outputs/`: final `.img` artifacts (or `.img.xz` when compression is requested)
 
 ## Troubleshooting
 

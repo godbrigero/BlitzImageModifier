@@ -6,7 +6,7 @@ ROOT="${BLITZ_HARDWARE_ROOT:-}"
 SUDO=()
 if [ "${EUID:-$(id -u)}" -ne 0 ]; then SUDO=(sudo); fi
 
-"${SUDO[@]}" apt-get install -y --no-install-recommends \
+"${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     python3-venv gpiod libgpiod-dev python3-libgpiod python3-gpiozero python3-lgpio \
     i2c-tools python3-smbus python3-spidev \
     rpicam-apps-lite python3-libcamera python3-picamera2
