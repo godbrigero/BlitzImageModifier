@@ -50,7 +50,7 @@ sudo apt-get install git
 2. Clone the BlitzImageModifier repository:
 
 ```bash
-git clone https://github.com/PinewoodRobotics/BlitzImageModifier.git
+git clone https://github.com/godbrigero/BlitzImageModifier.git
 ```
 
 3. cd into the BlitzImageModifier repository and run the jetson_nano.bash script:
@@ -62,6 +62,12 @@ watchdog service. Do not rename or replace your existing user with `ubuntu`.
 Update ImageModifier before installation; old copies downloaded an installer
 separately from BLITZ and could fail with `scripts/install.sh: No such file or directory`.
 
+The maintained installation scripts currently live in
+`https://github.com/godbrigero/BlitzImageModifier.git`. The older
+`PinewoodRobotics/BlitzImageModifier` repository still invokes the removed
+`scripts/install.sh`; pulling that repository does not retrieve these fixes.
+Check the repository URL with `git remote -v`.
+
 ```bash
 cd BlitzImageModifier
 git pull --ff-only
@@ -69,6 +75,19 @@ bash ./installation/extra/jetson_nano.bash
 ```
 
 ### Retrying the missing installer failure
+
+If the checkout came from `PinewoodRobotics/BlitzImageModifier`, clone the
+maintained repository into a separate folder and use its installer:
+
+```bash
+cd ..
+git clone https://github.com/godbrigero/BlitzImageModifier.git BlitzImageModifier-current
+cd BlitzImageModifier-current
+bash ./installation/extra/jetson_nano.bash
+```
+
+This preserves the previous ImageModifier folder and the installed
+`/opt/blitz/B.L.I.T.Z` checkout. It does not require reflashing the Jetson.
 
 After updating ImageModifier, rerun the same command. The Jetson script reuses
 an existing BLITZ checkout without deleting it, preserves an existing device
