@@ -14,7 +14,9 @@ BLITZ_USER ?= ubuntu
 BLITZ_PASSWORD ?= ubuntu
 BLITZ_UID ?= 1000
 BLITZ_GID ?= 1000
+ifneq ($(origin BLITZ_SOURCE_DIR),undefined)
 export BLITZ_SOURCE_DIR
+endif
 export BLITZ_REF
 export BLITZ_GIT_URL
 export BLITZ_USER

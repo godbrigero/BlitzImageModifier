@@ -46,7 +46,7 @@ for required in scripts/ui/install_on_system.sh scripts/setup.sh Makefile \
     backend/deployment/module/catalog.py; do
     if [ ! -f "$SOURCE_DIR/$required" ]; then
         echo "Incompatible or incomplete BLITZ checkout: missing $required in $SOURCE_DIR." >&2
-        echo "Update this checkout to BLITZ 1.2.0 or later, then retry. No existing files were deleted." >&2
+        echo "Update this checkout to BLITZ 3.0.0 or later, then retry. No existing files were deleted." >&2
         exit 1
     fi
 done

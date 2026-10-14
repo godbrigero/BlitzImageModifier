@@ -6,14 +6,8 @@ COMMAND="${1:-status}"
 SIM_IMAGE="${SIM_IMAGE:-blitz-sim:latest}"
 SIM_NETWORK="${SIM_NETWORK:-blitz-sim}"
 SIM_CONTAINER_PREFIX="${SIM_CONTAINER_PREFIX:-blitz-sim}"
-SIM_AUTOBAHN_HOST_PORT_BASE="${SIM_AUTOBAHN_HOST_PORT_BASE:-${SIM_AUTOBANH_HOST_PORT_BASE:-18080}}"
-SIM_WATCHDOG_HOST_PORT_BASE="${SIM_WATCHDOG_HOST_PORT_BASE:-15000}"
-SIM_SSH_HOST_PORT_BASE="${SIM_SSH_HOST_PORT_BASE:-2220}"
 SIM_HOST_IP_PREFIX="${SIM_HOST_IP_PREFIX:-127.42.0}"
 SIM_NAMES="${SIM_NAMES:-}"
-PYTHON="${PYTHON:-python3}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SIM_MDNS_BRIDGE="${SIM_MDNS_BRIDGE:-$SCRIPT_DIR/mdns_bridge.py}"
 N="${N:-1}"
 SIM_STATUS_INTERVAL_SECONDS="${SIM_STATUS_INTERVAL_SECONDS:-3}"
 
@@ -227,9 +221,6 @@ function start_containers() {
         [ -n "$name" ] && names+=("$name")
     done < <(resolved_sim_names)
 
-    require_positive_integer SIM_AUTOBAHN_HOST_PORT_BASE "$SIM_AUTOBAHN_HOST_PORT_BASE"
-    require_positive_integer SIM_WATCHDOG_HOST_PORT_BASE "$SIM_WATCHDOG_HOST_PORT_BASE"
-    require_positive_integer SIM_SSH_HOST_PORT_BASE "$SIM_SSH_HOST_PORT_BASE"
     ensure_network
     remove_all_sim_containers
 
@@ -364,18 +355,6 @@ function hosts() {
     done
 }
 
-function start_mdns_bridge() {
-    local log_file="$1"
-
-    if [ ! -f "$SIM_MDNS_BRIDGE" ]; then
-        echo "mDNS bridge script not found: $SIM_MDNS_BRIDGE" >&2
-        return 1
-    fi
-
-    PYTHONUNBUFFERED=1 "$PYTHON" "$SIM_MDNS_BRIDGE" > "$log_file" 2>&1 &
-    printf '%s\n' "$!"
-}
-
 function start_sudo_keepalive() {
     if [ "${EUID:-$(id -u)}" -eq 0 ]; then
         return
@@ -421,7 +400,7 @@ function draw_status_ui() {
     fi
 
     printf 'Blitz simulator running (%s nodes). Press Ctrl+C to stop and clean up.\n' "$total"
-    printf 'Host aliases and mDNS bridge are active while this process is running.\n\n'
+    printf 'Host aliases and published service endpoints are active while this process is running.\n\n'
     printf '%-22s %-12s %-12s %-12s %-22s %-22s %-14s\n' \
         'NAME' 'CONTAINER' 'WATCHDOG' 'AUTOBAHN' 'WATCHDOG URL' 'AUTOBAHN URL' 'SSH'
 
@@ -454,12 +433,8 @@ function draw_status_ui() {
 function supervise() {
     local names=()
     local name
-    local mdns_pid=""
     local sudo_keepalive_pid=""
-    local mdns_log=""
     local cleanup_started=false
-
-    mdns_log="$(mktemp)"
 
     function cleanup_supervisor() {
         if [ "$cleanup_started" = true ]; then
@@ -470,11 +445,6 @@ function supervise() {
 
         printf '\nStopping simulator and cleaning host state...\n'
 
-        if [ -n "$mdns_pid" ] && kill -0 "$mdns_pid" >/dev/null 2>&1; then
-            kill "$mdns_pid" >/dev/null 2>&1 || true
-            wait "$mdns_pid" >/dev/null 2>&1 || true
-        fi
-
         down
 
         if [ -n "$sudo_keepalive_pid" ] && kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1; then
@@ -482,7 +452,6 @@ function supervise() {
             wait "$sudo_keepalive_pid" >/dev/null 2>&1 || true
         fi
 
-        rm -f "$mdns_log"
         printf 'Simulator stopped.\n'
     }
 
@@ -496,16 +465,9 @@ function supervise() {
     done < <(start_containers)
 
     hosts
-    mdns_pid="$(start_mdns_bridge "$mdns_log")"
 
     while true; do
         draw_status_ui "${names[@]}"
-
-        if [ -n "$mdns_pid" ] && ! kill -0 "$mdns_pid" >/dev/null 2>&1; then
-            printf '\nERROR: mDNS bridge exited unexpectedly. Recent bridge log:\n' >&2
-            tail -20 "$mdns_log" >&2 || true
-            exit 1
-        fi
 
         sleep "$SIM_STATUS_INTERVAL_SECONDS"
     done

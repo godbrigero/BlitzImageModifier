@@ -4,8 +4,10 @@ set -euo pipefail
 ROOT="${BLITZ_INSTALLATION_DIR:-/opt/blitz}/B.L.I.T.Z"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
-BLITZ_PATH="$ROOT" .venv/bin/python "$SCRIPT_DIR/../util/check_blitz_runtime.py"
-BLITZ_PATH="$ROOT" .venv/bin/python -c 'import watchdog.__main__; print("Watchdog startup imports verified")'
+# Ownership has already been finalized. Validation must exercise the same user
+# as the service and must not recreate root-owned bytecode in the runtime tree.
+sudo -u "${BLITZ_USER:-ubuntu}" env BLITZ_PATH="$ROOT" .venv/bin/python "$SCRIPT_DIR/../util/check_blitz_runtime.py"
+sudo -u "${BLITZ_USER:-ubuntu}" env BLITZ_PATH="$ROOT" .venv/bin/python -c 'import watchdog.__main__; print("Watchdog startup imports verified")'
 
 for service in blitz-startup autobahn ssh avahi-daemon; do
     systemctl is-enabled "$service" >/dev/null
@@ -22,7 +24,7 @@ done
 
 if systemctl is-system-running >/dev/null 2>&1 || \
     [ "$(systemctl is-system-running 2>/dev/null || true)" = degraded ]; then
-    if ! BLITZ_PATH="$ROOT" .venv/bin/python "$SCRIPT_DIR/../util/check_watchdog_http.py"; then
+    if ! sudo -u "${BLITZ_USER:-ubuntu}" env BLITZ_PATH="$ROOT" .venv/bin/python "$SCRIPT_DIR/../util/check_watchdog_http.py"; then
         sudo journalctl -u blitz-startup -n 40 --no-pager >&2 || true
         exit 1
     fi
@@ -59,5 +61,10 @@ if [ "${BLITZ_ROUTER_ENABLED:-false}" = true ]; then
         test "$(stat -c '%U' "$profile")" = root
     done
     echo "Pi router profiles and boot services verified (Wi-Fi activation requires reboot)"
+fi
+foreign_file="$(find "$ROOT" ! -user "${BLITZ_USER:-ubuntu}" -print -quit)"
+if [ -n "$foreign_file" ]; then
+    echo "Runtime tree contains a file not owned by ${BLITZ_USER:-ubuntu}: $foreign_file" >&2
+    exit 1
 fi
 echo "Image runtime, services, ownership, and module launch verified"

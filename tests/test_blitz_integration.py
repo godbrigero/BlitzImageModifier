@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import importlib.util
-import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import uuid
 
 import pytest
 
@@ -13,31 +12,33 @@ ROOT = Path(__file__).resolve().parents[1]
 BLITZ = Path(os.environ.get("BLITZ_SOURCE_DIR", ROOT.parent / "BLITZ"))
 
 
-def load_module(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_simulator_discovery_matches_current_backend():
-    sys.path.insert(0, str(BLITZ))
-    from backend.deployment.network_api.zeroconf import DiscoveredNetworkSystem
-    bridge = load_module("test_mdns_bridge", ROOT / "simulation_utility/mdns_bridge.py")
-    properties = {
-        "hostname": "jetson.local", "system_name": "jetson", "watchdog_port": "5000",
-        "autobahn_port": "8080", "blitz_path": "/opt/blitz/B.L.I.T.Z",
-        "machine_architecture": "aarch64", "platform_description": "Linux-glibc2.35",
-        "python_major_version": "3", "python_minor_version": "10",
-        "os_distribution_id": "ubuntu", "os_distribution_version_id": "22.04",
-        "capabilities_json": json.dumps({"cuda": "12.2"}),
-    }
-    node = bridge.SimNode("jetson", "127.42.0.1", 5000, 8080, properties)
-    discovered = DiscoveredNetworkSystem.from_service_info(bridge.service_info_for(node))
-    assert discovered.blitz_path == properties["blitz_path"]
-    assert discovered.watchdog_port == 5000
-    assert discovered.to_system_id().capabilities == (("cuda", "12.2"),)
+def test_post_provisioning_validation_preserves_login_user_ownership():
+    """Run with BLITZ_SIM_TEST_IMAGE=<built simulator image> and Docker."""
+    image = os.environ.get("BLITZ_SIM_TEST_IMAGE")
+    if not image:
+        pytest.skip("Set BLITZ_SIM_TEST_IMAGE to run the real image ownership regression")
+    name = "blitz-ownership-test-" + uuid.uuid4().hex[:10]
+    def docker(*args):
+        return subprocess.check_output(["docker", *args], text=True, stderr=subprocess.STDOUT, timeout=120)
+    try:
+        docker("run", "-d", "--name", name, "--entrypoint", "/bin/sleep", image, "180")
+        docker("cp", str(ROOT / "installation"), f"{name}:/tmp/ownership-installation")
+        # Force fresh imports after provisioning, instead of reusing the image's
+        # existing bytecode. Only this disposable container is modified.
+        docker("exec", name, "bash", "-c", '''set -e
+bash /tmp/ownership-installation/modules/finalize_permissions.bash
+find /opt/blitz/B.L.I.T.Z/backend/deployment /opt/blitz/B.L.I.T.Z/watchdog -type d -name __pycache__ -prune -exec rm -rf {} +
+bash /tmp/ownership-installation/modules/validate_image.bash
+test -d /opt/blitz/B.L.I.T.Z/watchdog/routes/__pycache__
+''')
+        foreign = docker("exec", name, "find", "/opt/blitz/B.L.I.T.Z", "!", "-user", "ubuntu", "-print", "-quit")
+        assert not foreign.strip(), foreign
+        docker("exec", name, "touch", "/opt/blitz/B.L.I.T.Z/backend/root-owned-regression-file")
+        invalid = subprocess.run(["docker", "exec", name, "bash", "/tmp/ownership-installation/modules/validate_image.bash"], capture_output=True, text=True, timeout=120)
+        assert invalid.returncode != 0
+        assert "not owned by ubuntu" in invalid.stderr
+    finally:
+        subprocess.run(["docker", "rm", "-f", name], capture_output=True)
 
 
 @pytest.mark.parametrize("mode", ["local", "git", "system-packages"])
@@ -119,7 +120,7 @@ chmod +x "$destination/bin/python"
     assert again.returncode != 0
     assert "already exists" in again.stderr
     # A Jetson retry uses the existing checkout and preserves its assigned name.
-    (installed / "backend/deployment/.blitz-build-version").write_text("1.2.0\n")
+    (installed / "backend/deployment/.blitz-build-version").write_text("3.0.0\n")
     (installed / "system_data/name.txt").write_text("existing-jetson\n")
     resumed = subprocess.run(["bash", str(ROOT / "installation/modules/installation_blitz.bash")],
         env=dict(environment, BLITZ_RESUME_INSTALL="true"), capture_output=True, text=True)
@@ -147,5 +148,5 @@ def test_resume_rejects_old_checkout_without_running_installer(tmp_path):
                  BLITZ_RESUME_INSTALL="true"), capture_output=True, text=True)
     assert result.returncode != 0
     assert "missing scripts/ui/install_on_system.sh" in result.stderr
-    assert "BLITZ 1.2.0 or later" in result.stderr
+    assert "BLITZ 3.0.0 or later" in result.stderr
     assert (installed / "scripts/install.sh").read_text() == "exit 99\n"

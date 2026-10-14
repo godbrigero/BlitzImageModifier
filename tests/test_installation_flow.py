@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import signal
 import subprocess
+import time
 
 import pytest
 
@@ -14,6 +16,59 @@ def tool(directory: Path, name: str, body: str) -> None:
     path = directory / name
     path.write_text("#!/bin/bash\nset -eu\n" + body + "\n")
     path.chmod(0o755)
+
+
+@pytest.mark.parametrize("signum", [signal.SIGINT, signal.SIGTERM])
+def test_simulator_supervises_and_cleans_up_without_host_python_or_mdns(tmp_path, signum):
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    log = tmp_path / "commands"
+    output = tmp_path / "output"
+    tool(tools, "uname", 'echo Linux')
+    # No host networking or Docker state is changed by this regression.
+    tool(tools, "sudo", '''printf 'sudo %s\\n' "$*" >> "$TEST_LOG"
+if [ "$1" = -n ]; then exit 1; fi''')
+    tool(tools, "docker", '''printf 'docker %s\\n' "$*" >> "$TEST_LOG"
+case "$1" in
+  ps) if [ "${2:-}" != -aq ]; then echo sim-test-1; fi ;;
+  container) exit 1 ;;
+  network) echo test-network ;;
+  run) echo test-container ;;
+  inspect)
+    case "$*" in
+      *Config.Labels*) echo 127.42.0.1 ;;
+      *State.Status*) echo running ;;
+      *) echo 172.20.0.2 ;;
+    esac ;;
+  exec)
+    if [ "$3" = systemctl ]; then echo active; else cat >/dev/null; fi ;;
+  port) printf '127.42.0.1:%s\\n' "${3%/*}" ;;
+esac''')
+    environment = dict(os.environ, PATH=f"{tools}:{os.environ['PATH']}",
+        TEST_LOG=str(log), SIM_NAMES="sim-test-1", SIM_STATUS_INTERVAL_SECONDS="0.1",
+        PYTHON="/missing/python", SIM_MDNS_BRIDGE="/missing/bridge.py")
+    with output.open("w") as stream:
+        process = subprocess.Popen(["make", "sim-up"], cwd=ROOT, env=environment,
+            stdout=stream, stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if "Docker nodes running: 1/1" in output.read_text():
+                    break
+                assert process.poll() is None, output.read_text()
+                time.sleep(0.05)
+            assert "Docker nodes running: 1/1" in output.read_text(), output.read_text()
+            assert process.poll() is None
+            os.killpg(process.pid, signum)
+            process.wait(timeout=5)
+            assert "Simulator stopped." in output.read_text()
+            assert "Host aliases and published service endpoints" in output.read_text()
+            assert "docker run -d" in log.read_text()
+            assert "python" not in log.read_text()
+        finally:
+            if process.poll() is None:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=5)
 
 
 @pytest.mark.parametrize("device,image,state", [

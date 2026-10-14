@@ -9,9 +9,9 @@ def validate_source(root: Path) -> None:
         version = version_file.read_text().strip()
         parts = tuple(int(part) for part in version.split("."))
     except (OSError, ValueError) as error:
-        raise RuntimeError("Missing or invalid BLITZ deployment version; require 1.2.0 or later") from error
-    if len(parts) != 3 or parts < (1, 2, 0):
-        raise RuntimeError("BLITZ deployment {} is too old; require 1.2.0 or later".format(version))
+        raise RuntimeError("Missing or invalid BLITZ deployment version; require 3.0.0 or later") from error
+    if len(parts) != 3 or parts < (3, 0, 0):
+        raise RuntimeError("BLITZ deployment {} is too old; require 3.0.0 or later".format(version))
     print("Selected BLITZ deployment source: {}".format(version))
 
 

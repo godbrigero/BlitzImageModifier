@@ -79,8 +79,12 @@ WORKDIR /workspace
 
 COPY installation /workspace/installation
 COPY simulation_utility/entrypoint.bash /usr/local/bin/blitz-sim-entrypoint.bash
+COPY blitz-source /workspace/blitz-source
 
 RUN chmod +x /usr/local/bin/blitz-sim-entrypoint.bash \
+    && if [ -f /workspace/blitz-source/scripts/ui/install_on_system.sh ]; then \
+        export BLITZ_SOURCE_DIR=/workspace/blitz-source; \
+    fi \
     && cd /workspace/installation/modules \
     && BLITZ_IMAGE_BUILD=true BLITZ_DEVICE=linux bash ./main_startup.bash \
     && mkdir -p /etc/systemd/system/multi-user.target.wants \
@@ -98,6 +102,7 @@ RUN chmod +x /usr/local/bin/blitz-sim-entrypoint.bash \
         fi; \
     done \
     && rm -f /usr/local/sbin/systemctl /usr/sbin/policy-rc.d \
+    && rm -rf /workspace/blitz-source \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 

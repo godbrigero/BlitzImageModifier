@@ -113,7 +113,7 @@ sudo dd if=outputs/pi5_flash_image.img of=/dev/sdX bs=4M status=progress conv=fs
 - **Extra space**: `installation/devices_and_distros/build.bash` uses its fourth argument, default `6G`.
 - **Hardware script**: add a device script and matching image configuration under `installation/devices_and_distros/`; use the shared installation stages.
 - **Target image user**: pass `BLITZ_USER`, `BLITZ_PASSWORD`, `BLITZ_UID`, or `BLITZ_GID` to `make`. Defaults are `ubuntu`, `ubuntu`, `1000`, and `1000`.
-- **BLITZ revision**: pass `BLITZ_REF=<branch/tag/commit>` to `make build-for pi5` or `make sim-build`. The installer and runtime use that same checkout. A commit SHA gives reproducible builds; `HEAD` follows upstream.
+- **BLITZ revision**: pass `BLITZ_REF=<branch/tag/commit>` to `make build-for pi5` or `make sim-build`. The installer and runtime use that same checkout. A commit SHA gives reproducible builds. By default, `sim-build` uses a sibling `BLITZ` working tree when present; `BLITZ_SOURCE_DIR=` selects upstream `HEAD` explicitly.
 - **Default device name**: `installation_blitz.bash` (`DEFAULT_PI_NAME`). This is used on first boot before prompting.
 - **udev rules**: edit the profile's rule in `installation/system-patch/`; `install_device_rules.bash` installs it and reloads live udev.
 - **Output filename**: `build.bash` supplies `<device>_flash_image` to the export script.
@@ -155,7 +155,19 @@ docker compose down -v
 
 # Remove old outputs (optional)
 rm -f outputs/*.img outputs/*.img.xz
+
+# Simulated watchdog and backend process logs
+make sim-logs
+make sim-logs FOLLOW=1
+
+# Autobahn logs, or another simulated Pi
+make sim-logs SERVICE=autobahn
+make sim-logs NAME=blitz-sim-2 LINES=50
 ```
+
+The watchdog is installed as `blitz-startup.service`. Inside `make sim-shell`,
+use `journalctl -u blitz-startup.service -f`. `FOLLOW=1` streams logs in an
+interactive terminal and stops with Ctrl-C.
 
 ## Notes
 
@@ -168,7 +180,9 @@ Add a license here (e.g., MIT, Apache-2.0) if applicable.
 
 ## Updated BLITZ deployment integration
 
-Images require BLITZ deployment **1.2.0 or later**. Image creation checks the module
+Images require BLITZ deployment **3.0.0 or later**, matching the client’s schema
+version 3. The catalog contains native capability objects and uses only
+`/get/system/catalog`. Image creation checks the module
 catalog, typed launch contracts, watchdog discovery, installation root, and offline
 transfer tools. An older or incompatible source checkout fails the build with an
 error. Changes in your local BLITZ repository must be published before using a
@@ -176,6 +190,7 @@ remote revision; selecting a branch does not include uncommitted changes.
 
 ```bash
 make build-for pi5 BLITZ_SOURCE_DIR=/path/to/your/updated/BLITZ
+make sim-build BLITZ_SOURCE_DIR=/path/to/your/updated/BLITZ
 # Or use an already-published revision:
 make build-for pi5 BLITZ_REF=<published-commit>
 make sim-build BLITZ_REF=<published-commit>
@@ -185,8 +200,12 @@ For Pi image builds, `make build-for pi5 BLITZ_SOURCE_DIR=/path/to/BLITZ` mounts
 the host source read-only into the build container and chroot. The installer
 also accepts `BLITZ_SOURCE_DIR` directly inside a prepared build environment. It copies working-tree changes and excludes virtual environments,
 build artifacts, website files, `.env` files, and the developer's device name.
-This option is for an environment where the source is already mounted; passing a
-host path to `make sim-build` does not mount that path automatically.
+`make sim-build` stages that host source into its Docker build context, including
+uncommitted changes. Without an explicit source or Git revision, it uses a sibling
+`BLITZ` directory if present. A non-default `BLITZ_REF` or `BLITZ_GIT_URL` selects
+Git unless `BLITZ_SOURCE_DIR` is supplied. Set `BLITZ_SOURCE_DIR=` to force Git
+even when a sibling checkout exists. The selected source is printed before the
+build; the temporary context is removed afterward.
 
 The target layout stays:
 
@@ -210,11 +229,15 @@ and installs Python dependencies from bundled wheels offline. Module programs
 receive runtime paths through environment variables and require no BLITZ CLI flags
 by default. `BLITZ_USER` also selects the watchdog service account, matching the
 ownership established by `finalize_permissions.bash`.
+After that step, Python validation runs as the same login user and rejects any
+foreign-owned files in the runtime tree, including bytecode caches.
 
-The simulator bridge obtains discovery properties from the installed watchdog,
-including distro, Python version, architecture, and CUDA capabilities. The
+Simulation uses explicitly configured watchdog HTTP addresses. `sim-up` exposes
+the service ports and installs local hostname aliases; it needs no host mDNS
+bridge or Python discovery helper. Deployment collects distro, Python version,
+architecture, and verified capabilities from the watchdog's BLITZ 3 catalog. The
 simulator describes its own Linux container, not Raspberry Pi hardware or a real
-NVIDIA GPU. You can select it directly without mDNS:
+NVIDIA GPU. Select the published watchdog address directly:
 
 ```bash
 # In your application project, using that project's updated deploy.py:
@@ -227,11 +250,18 @@ Integration regression tests (using BLITZ's test environment):
 BLITZ_SOURCE_DIR=/path/to/BLITZ /path/to/BLITZ/.venv/bin/python -m pytest tests/ -q
 ```
 
+With a built simulator image, also exercise fresh bytecode creation during
+post-provisioning validation and rejection of foreign-owned runtime files:
+
+```bash
+BLITZ_SIM_TEST_IMAGE=blitz-sim:latest BLITZ_SOURCE_DIR=/path/to/BLITZ /path/to/BLITZ/.venv/bin/python -m pytest tests/test_blitz_integration.py::test_post_provisioning_validation_preserves_login_user_ownership
+```
+
 To recheck an installed image, run from its BLITZ root with the image modifier's
 `installation/util/check_blitz_runtime.py` available:
 
 ```bash
-BLITZ_PATH="$PWD" .venv/bin/python /workspace/installation/util/check_blitz_runtime.py
+sudo -u "${BLITZ_USER:-ubuntu}" env BLITZ_PATH="$PWD" .venv/bin/python /workspace/installation/util/check_blitz_runtime.py
 ```
 
 ### Pi 5 build verification

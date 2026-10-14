@@ -16,22 +16,22 @@ def check_runtime(root: Path) -> str:
     from backend.deployment.module.supported import SupportedModules
     from backend.deployment.processes import ProcessPlan
     from watchdog.process_starter import OpenedProcess
-    from watchdog.util.system import DiscoveredNetworkSystem
+    from watchdog.util.system import collect_system_catalog
 
     version = (root / "backend/deployment/.blitz-build-version").read_text().strip()
     try:
         parts = tuple(int(part) for part in version.split("."))
     except ValueError as error:
         raise RuntimeError(f"Invalid BLITZ deployment version: {version}") from error
-    if parts < (1, 2, 0):
-        raise RuntimeError(f"BLITZ deployment {version} is too old; require 1.2.0 or later")
+    if parts < (3, 0, 0):
+        raise RuntimeError(f"BLITZ deployment {version} is too old; require 3.0.0 or later")
     if LaunchSettings().accepts_blitz_flags:
         raise RuntimeError("Runtime unexpectedly injects legacy BLITZ CLI flags")
     modules = BackendModules(root / "backend/deploy.py")
     if Path(modules.backend_path) != root / "backend":
         raise RuntimeError("Backend module root does not match the installed source tree")
-    # Discovery uses the same target-side collector as the mDNS bridge and API.
-    discovered = DiscoveredNetworkSystem.collect()
+    # The watchdog caches HTTP catalogs built by this target-side collector.
+    discovered = collect_system_catalog()
     if Path(discovered.blitz_path).resolve() != root:
         raise RuntimeError("Watchdog discovery advertises a different installation root")
     tools = ("rsync", "unzip", "ssh", "ip") if platform.system() == "Linux" else ("rsync", "unzip", "ssh")
